@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Create Agent - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Create Agent</h1>
+            <a href="/agents" class="btn btn-outline-secondary">Back to Agents</a>
+        </div>
+        <p class="text-muted">Define a new evaluation agent with model configuration and metrics</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if error %}
+                    <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                
+                <form method="post" action="/agents">
+                    <!-- Basic Information -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5>Basic Information</h5>
+                            <hr>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Name *</label>
+                            <input type="text" class="form-control" id="name" name="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="tags" class="form-label">Tags</label>
+                            <input type="text" class="form-control" id="tags" name="tags" placeholder="Comma-separated tags">
+                            <div class="form-text">Optional tags to categorize this agent</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="Describe what this agent is designed to test"></textarea>
+                    </div>
+
+                    <!-- Model Configuration -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5>Model Configuration</h5>
+                            <hr>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="model_provider" class="form-label">Provider *</label>
+                            <select class="form-select" id="model_provider" name="model_provider" required>
+                                <option value="">Select provider</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="azure">Azure OpenAI</option>
+                                <option value="google">Google</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="model_name" class="form-label">Model *</label>
+                            <input type="text" class="form-control" id="model_name" name="model_name" placeholder="e.g., gpt-4, claude-3-opus" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="temperature" class="form-label">Temperature</label>
+                            <input type="number" class="form-control" id="temperature" name="temperature" step="0.1" min="0" max="2" value="0.7">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="max_tokens" class="form-label">Max Tokens</label>
+                            <input type="number" class="form-control" id="max_tokens" name="max_tokens" min="1" value="1000">
+                        </div>
+                    </div>
+
+                    <!-- Metrics Configuration -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5>Metrics Configuration</h5>
+                            <hr>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="llm_as_judge_enabled" name="llm_as_judge_enabled" checked>
+                                <label class="form-check-label" for="llm_as_judge_enabled">
+                                    Enable LLM-as-Judge
+                                </label>
+                            </div>
+                            <div class="form-text">Use an LLM to evaluate response quality</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="faithfulness_enabled" name="faithfulness_enabled" checked>
+                                <label class="form-check-label" for="faithfulness_enabled">
+                                    Enable Faithfulness
+                                </label>
+                            </div>
+                            <div class="form-text">Measure response adherence to source material</div>
+                        </div>
+                    </div>
+
+                    <!-- Judge Model Configuration -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5>Judge Model Configuration</h5>
+                            <hr>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="judge_model_provider" class="form-label">Judge Provider</label>
+                            <select class="form-select" id="judge_model_provider" name="judge_model_provider">
+                                <option value="openai" selected>OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="azure">Azure OpenAI</option>
+                                <option value="google">Google</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="judge_model_name" class="form-label">Judge Model</label>
+                            <input type="text" class="form-control" id="judge_model_name" name="judge_model_name" value="gpt-4">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="judge_temperature" class="form-label">Judge Temperature</label>
+                            <input type="number" class="form-control" id="judge_temperature" name="judge_temperature" step="0.1" min="0" max="2" value="0.0">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="judge_prompt" class="form-label">Judge Prompt</label>
+                        <textarea class="form-control" id="judge_prompt" name="judge_prompt" rows="4" placeholder="Enter custom judge prompt (leave blank for default)"></textarea>
+                        <div class="form-text">Custom prompt for the LLM judge to evaluate responses</div>
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="row">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Create Agent</button>
+                            <a href="/agents" class="btn btn-secondary ms-2">Cancel</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

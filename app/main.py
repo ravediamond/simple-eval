@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 from app.database import init_db, get_db
-from app.models import Dataset, DatasetVersion
+from app.models import Dataset, DatasetVersion, Agent, AgentVersion
 from app.dataset_utils import DatasetProcessor
 
 load_dotenv()
@@ -37,9 +37,13 @@ async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 @app.get("/agents", response_class=HTMLResponse)
-async def agents(request: Request):
+async def agents(request: Request, db: Session = Depends(get_db)):
     """Agents page"""
-    return templates.TemplateResponse("agents.html", {"request": request})
+    agents = db.query(Agent).all()
+    return templates.TemplateResponse("agents.html", {
+        "request": request,
+        "agents": agents
+    })
 
 @app.get("/datasets", response_class=HTMLResponse)
 async def datasets(request: Request, db: Session = Depends(get_db)):
@@ -153,6 +157,99 @@ async def preview_dataset(dataset_id: int, version_id: int, db: Session = Depend
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading dataset: {str(e)}")
+
+@app.get("/agents/new", response_class=HTMLResponse)
+async def new_agent_form(request: Request):
+    """New agent form"""
+    return templates.TemplateResponse("new_agent.html", {"request": request})
+
+@app.post("/agents")
+async def create_agent(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    tags: str = Form(""),
+    model_provider: str = Form(...),
+    model_name: str = Form(...),
+    temperature: float = Form(0.7),
+    max_tokens: int = Form(1000),
+    llm_as_judge_enabled: bool = Form(True),
+    faithfulness_enabled: bool = Form(True),
+    judge_model_provider: str = Form("openai"),
+    judge_model_name: str = Form("gpt-4"),
+    judge_temperature: float = Form(0.0),
+    judge_prompt: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """Create a new agent"""
+    try:
+        # Parse tags
+        tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
+        
+        # Create agent
+        agent = Agent(
+            name=name,
+            description=description,
+            tags=tag_list
+        )
+        db.add(agent)
+        db.flush()  # Get the ID
+        
+        # Create initial agent version
+        model_config = {
+            "provider": model_provider,
+            "model": model_name,
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        judge_model_config = {
+            "provider": judge_model_provider,
+            "model": judge_model_name,
+            "temperature": judge_temperature
+        }
+        
+        default_thresholds = {
+            "llm_as_judge": 0.8,
+            "faithfulness": 0.8
+        }
+        
+        default_judge_prompt = judge_prompt or "Please evaluate the following response for quality and accuracy. Rate from 0 to 1 where 1 is excellent and 0 is poor."
+        
+        version = AgentVersion(
+            agent_id=agent.id,
+            version_number=1,
+            notes="Initial version",
+            model_config=model_config,
+            llm_as_judge_enabled=llm_as_judge_enabled,
+            faithfulness_enabled=faithfulness_enabled,
+            default_thresholds=default_thresholds,
+            judge_model_config=judge_model_config,
+            judge_prompt=default_judge_prompt
+        )
+        db.add(version)
+        db.commit()
+        
+        return RedirectResponse(url="/agents", status_code=302)
+    
+    except Exception as e:
+        db.rollback()
+        return templates.TemplateResponse("new_agent.html", {
+            "request": request,
+            "error": f"Error creating agent: {str(e)}"
+        })
+
+@app.get("/agents/{agent_id}", response_class=HTMLResponse)
+async def agent_detail(request: Request, agent_id: int, db: Session = Depends(get_db)):
+    """Agent detail page"""
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    return templates.TemplateResponse("agent_detail.html", {
+        "request": request,
+        "agent": agent
+    })
 
 @app.get("/runs", response_class=HTMLResponse)
 async def runs(request: Request):
