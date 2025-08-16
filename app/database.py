@@ -27,4 +27,6 @@ def get_db():
 def init_db():
     """Initialize the database and create tables"""
     os.makedirs("data", exist_ok=True)
+    # Import models to ensure they're registered
+    from app.models import Dataset, DatasetVersion
     Base.metadata.create_all(bind=engine)
