@@ -699,3 +699,104 @@ async def get_case_details(run_id: int, case_id: str, db: Session = Depends(get_
         'passed': test_case.passed,
         'metrics': metric_details
     }
+
+@app.post("/api/runs/{run_id}/rescore")
+async def rescore_run(
+    run_id: int, 
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Phase 8: Re-score a run with new threshold overrides (no re-querying)"""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    
+    if run.status != 'completed':
+        raise HTTPException(status_code=400, detail="Can only re-score completed runs")
+    
+    try:
+        # Parse request body
+        body = await request.json()
+        threshold_overrides = body.get('threshold_overrides', {})
+        
+        # Validate thresholds
+        for metric_name, threshold in threshold_overrides.items():
+            if not isinstance(threshold, (int, float)) or threshold < 0 or threshold > 1:
+                raise HTTPException(status_code=400, detail=f"Invalid threshold for {metric_name}: must be between 0 and 1")
+        
+        # Apply threshold overrides to existing metric results
+        test_cases = db.query(TestCase).filter(TestCase.run_id == run_id).all()
+        
+        for test_case in test_cases:
+            metric_scores = []
+            for metric_result in test_case.metric_results:
+                # Get effective threshold (override or default)
+                effective_threshold = threshold_overrides.get(
+                    metric_result.metric_name, 
+                    run.agent_version.default_thresholds.get(metric_result.metric_name, 0.8)
+                )
+                
+                # Update metric result with new threshold and pass status
+                metric_result.threshold = effective_threshold
+                metric_result.passed = metric_result.score >= effective_threshold
+                metric_scores.append(metric_result.score)
+            
+            # Recalculate overall test case score and pass status
+            if metric_scores:
+                test_case.overall_score = sum(metric_scores) / len(metric_scores)
+                test_case.passed = all(mr.passed for mr in test_case.metric_results)
+            
+        # Recalculate run aggregates
+        _recalculate_run_aggregates(run, db)
+        
+        # Store threshold overrides
+        run.threshold_overrides = threshold_overrides
+        db.commit()
+        
+        return {"success": True, "message": "Run re-scored successfully"}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Re-scoring failed: {str(e)}")
+
+def _recalculate_run_aggregates(run: Run, db: Session):
+    """Helper function to recalculate run aggregate metrics"""
+    test_cases = db.query(TestCase).filter(TestCase.run_id == run.id).all()
+    
+    if not test_cases:
+        return
+    
+    # Overall score (average of all test case scores)
+    scores = [tc.overall_score for tc in test_cases if tc.overall_score is not None]
+    if scores:
+        run.overall_score = sum(scores) / len(scores)
+    
+    # Pass rate
+    passed_cases = sum(1 for tc in test_cases if tc.passed)
+    run.pass_rate = passed_cases / len(test_cases)
+    
+    # Aggregate results by metric
+    aggregate_results = {}
+    
+    # Get all metric results
+    all_metrics = db.query(MetricResult).join(TestCase).filter(TestCase.run_id == run.id).all()
+    
+    # Group by metric name
+    metrics_by_name = {}
+    for metric in all_metrics:
+        if metric.metric_name not in metrics_by_name:
+            metrics_by_name[metric.metric_name] = []
+        metrics_by_name[metric.metric_name].append(metric)
+    
+    # Calculate aggregates for each metric
+    for metric_name, metric_results in metrics_by_name.items():
+        scores = [m.score for m in metric_results]
+        passed_count = sum(1 for m in metric_results if m.passed)
+        
+        aggregate_results[metric_name] = {
+            'score': sum(scores) / len(scores) if scores else 0,
+            'pass_rate': passed_count / len(metric_results) if metric_results else 0,
+            'total_cases': len(metric_results)
+        }
+    
+    run.aggregate_results = aggregate_results

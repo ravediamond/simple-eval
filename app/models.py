@@ -114,6 +114,9 @@ class Run(Base):
     pass_rate = Column(Float)
     aggregate_results = Column(JSON)  # {metric_name: {score: float, passed: bool}}
     
+    # Threshold overrides for re-scoring (Phase 8)
+    threshold_overrides = Column(JSON)  # {metric_name: threshold_value} - overrides agent defaults
+    
     # Timing
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
