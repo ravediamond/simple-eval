@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1>Dashboard</h1>
+        <p class="text-muted">Welcome to Simple Eval - your lightweight chatbot evaluation platform</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Agents</h5>
+                <p class="card-text">Manage your evaluation agents and their configurations.</p>
+                <a href="/agents" class="btn btn-primary">View Agents</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Datasets</h5>
+                <p class="card-text">Upload and manage your evaluation datasets.</p>
+                <a href="/datasets" class="btn btn-primary">View Datasets</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Runs</h5>
+                <p class="card-text">View and manage your evaluation runs.</p>
+                <a href="/runs" class="btn btn-primary">View Runs</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">No recent runs yet. Start by creating an agent and dataset.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

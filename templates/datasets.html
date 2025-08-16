@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Datasets - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Datasets</h1>
+            <button class="btn btn-primary">Upload Dataset</button>
+        </div>
+        <p class="text-muted">Upload and manage your evaluation datasets</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted">No datasets uploaded yet. Upload your first dataset to start evaluating.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

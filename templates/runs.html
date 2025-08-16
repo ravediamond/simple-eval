@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Runs - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Runs</h1>
+            <button class="btn btn-primary">New Run</button>
+        </div>
+        <p class="text-muted">View and manage your evaluation runs</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted">No evaluation runs yet. Create an agent and dataset first, then start a new run.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

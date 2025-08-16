@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Agents - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Agents</h1>
+            <button class="btn btn-primary">Create Agent</button>
+        </div>
+        <p class="text-muted">Manage your evaluation agents and their configurations</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted">No agents created yet. Create your first agent to start evaluating.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
