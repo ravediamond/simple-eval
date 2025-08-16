@@ -358,6 +358,20 @@
                                                             <small><strong>Reasoning:</strong> {{ metric.reasoning }}</small>
                                                         </div>
                                                         {% endif %}
+                                                        
+                                                        {% if metric.raw_judge_response %}
+                                                        <div class="mt-2">
+                                                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleVerboseArtifacts('{{ test_case.case_id }}-{{ metric.metric_name }}')">
+                                                                Show Judge Details
+                                                            </button>
+                                                            <div id="verbose-{{ test_case.case_id }}-{{ metric.metric_name }}" style="display: none;" class="mt-2">
+                                                                <small><strong>Judge Prompt:</strong></small>
+                                                                <pre class="bg-light p-2 small">{{ metric.judge_prompt_used or 'Not available' }}</pre>
+                                                                <small><strong>Raw Judge Response:</strong></small>
+                                                                <pre class="bg-light p-2 small">{{ metric.raw_judge_response }}</pre>
+                                                            </div>
+                                                        </div>
+                                                        {% endif %}
                                                     </div>
                                                 </div>
                                                 {% endfor %}
@@ -483,5 +497,18 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(failuresButton);
     }
 });
+
+function toggleVerboseArtifacts(artifactId) {
+    const element = document.getElementById('verbose-' + artifactId);
+    const button = event.target;
+    
+    if (element.style.display === 'none') {
+        element.style.display = 'block';
+        button.textContent = 'Hide Judge Details';
+    } else {
+        element.style.display = 'none';
+        button.textContent = 'Show Judge Details';
+    }
+}
 </script>
 {% endblock %}

@@ -56,8 +56,7 @@
                             <select class="form-select" id="agent_id" name="agent_id" required onchange="updateAgentVersions()">
                                 <option value="">Select an agent</option>
                                 {% for agent in agents %}
-                                    <option value="{{ agent.id }}" 
-                                            {% if selected_agent_version and agent.versions and selected_agent_version in [v.id for v in agent.versions] %}selected{% endif %}>
+                                    <option value="{{ agent.id }}">
                                         {{ agent.name }}
                                     </option>
                                 {% endfor %}
@@ -65,7 +64,7 @@
                         </div>
                         <div class="col-md-6">
                             <label for="agent_version_id" class="form-label">Agent Version *</label>
-                            <select class="form-select" id="agent_version_id" name="agent_version_id" required>
+                            <select class="form-select" id="agent_version_id" name="agent_version_id" required onchange="updateConnectorStatus()">
                                 <option value="">Select agent first</option>
                             </select>
                         </div>
@@ -77,8 +76,7 @@
                             <select class="form-select" id="dataset_id" name="dataset_id" required onchange="updateDatasetVersions()">
                                 <option value="">Select a dataset</option>
                                 {% for dataset in datasets %}
-                                    <option value="{{ dataset.id }}"
-                                            {% if selected_dataset_version and dataset.versions and selected_dataset_version in [v.id for v in dataset.versions] %}selected{% endif %}>
+                                    <option value="{{ dataset.id }}">
                                         {{ dataset.name }}
                                     </option>
                                 {% endfor %}
@@ -92,23 +90,76 @@
                         </div>
                     </div>
 
-                    <!-- Answers File Upload -->
+                    <!-- Evaluation Source -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <h5>Answers File</h5>
+                            <h5>Evaluation Method</h5>
                             <hr>
                         </div>
                     </div>
                     
                     <div class="row mb-3">
                         <div class="col-12">
-                            <label for="file" class="form-label">Upload Answers File *</label>
-                            <input type="file" class="form-control" id="file" name="file" 
-                                   accept=".jsonl,.csv,.json" required>
-                            <div class="form-text">
-                                Upload a file containing answers with format: <code>{"id": "case_id", "answer": "response text"}</code><br>
-                                Supported formats: .jsonl, .csv, .json<br>
-                                Must provide 100% coverage of dataset cases.
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="evaluation_source" id="upload_mode" value="upload" checked onchange="toggleEvaluationMode()">
+                                <label class="form-check-label" for="upload_mode">
+                                    Upload Answers File
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="evaluation_source" id="connector_mode" value="connector" onchange="toggleEvaluationMode()">
+                                <label class="form-check-label" for="connector_mode">
+                                    Live Evaluation (Connector)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Answers File Upload -->
+                    <div id="upload_section">
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5>Answers File</h5>
+                                <hr>
+                            </div>
+                        </div>
+                    
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <label for="file" class="form-label">Upload Answers File *</label>
+                                <input type="file" class="form-control" id="file" name="file" 
+                                       accept=".jsonl,.csv,.json">
+                                <div class="form-text">
+                                    Upload a file containing answers with format: <code>{"id": "case_id", "answer": "response text"}</code><br>
+                                    Supported formats: .jsonl, .csv, .json<br>
+                                    Must provide 100% coverage of dataset cases.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Evaluation Section -->
+                    <div id="connector_section" style="display: none;">
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5>Live Evaluation</h5>
+                                <hr>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <strong>Live Evaluation Mode:</strong> The selected agent will evaluate each question in the dataset directly using its configured connector. 
+                            Make sure the agent has a working connector configured.
+                        </div>
+                        
+                        <div id="connector_info" class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Agent Connector Status</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="connector_status">
+                                    <span class="text-muted">Select an agent to see connector status</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -167,6 +218,69 @@
 </div>
 
 <script>
+// Evaluation mode switching
+function toggleEvaluationMode() {
+    const uploadMode = document.getElementById('upload_mode').checked;
+    const uploadSection = document.getElementById('upload_section');
+    const connectorSection = document.getElementById('connector_section');
+    const fileInput = document.getElementById('file');
+    
+    if (uploadMode) {
+        uploadSection.style.display = 'block';
+        connectorSection.style.display = 'none';
+        fileInput.required = true;
+    } else {
+        uploadSection.style.display = 'none';
+        connectorSection.style.display = 'block';
+        fileInput.required = false;
+        updateConnectorStatus();
+    }
+}
+
+function updateConnectorStatus() {
+    const agentSelect = document.getElementById('agent_id');
+    const versionSelect = document.getElementById('agent_version_id');
+    const statusDiv = document.getElementById('connector_status');
+    
+    if (!agentSelect.value || !versionSelect.value) {
+        statusDiv.innerHTML = '<span class="text-muted">Select an agent and version to see connector status</span>';
+        return;
+    }
+    
+    const agentId = agentSelect.value;
+    const versionId = versionSelect.value;
+    
+    // Find agent version in data
+    let connectorEnabled = false;
+    let connectorConfig = null;
+    
+    if (agentData[agentId]) {
+        const version = agentData[agentId].find(v => v.id == versionId);
+        if (version && version.connector_enabled) {
+            connectorEnabled = true;
+            connectorConfig = version.connector_config;
+        }
+    }
+    
+    if (connectorEnabled && connectorConfig) {
+        statusDiv.innerHTML = `
+            <div class="d-flex align-items-center">
+                <span class="badge bg-success me-2">✓ Enabled</span>
+                <span>${connectorConfig.connector_type} - ${connectorConfig.endpoint_url}</span>
+            </div>
+            <small class="text-muted">Model: ${connectorConfig.model_name || 'Default'} | Rate limit: ${connectorConfig.rate_limit_per_minute || 60}/min</small>
+        `;
+    } else {
+        statusDiv.innerHTML = `
+            <div class="d-flex align-items-center">
+                <span class="badge bg-danger me-2">✗ Not Configured</span>
+                <span>This agent version does not have a connector configured</span>
+            </div>
+            <small class="text-muted">You need to configure a connector for live evaluation</small>
+        `;
+    }
+}
+
 // Agent and version selection data
 const agentData = {
     {% for agent in agents %}
@@ -175,7 +289,9 @@ const agentData = {
         {
             "id": {{ version.id }},
             "name": "{{ version.display_name }}",
-            "model": "{{ version.model_config.provider }}/{{ version.model_config.model }}"
+            "model": "{{ version.model_config.provider }}/{{ version.model_config.model }}",
+            "connector_enabled": {{ version.connector_enabled|lower }},
+            "connector_config": {{ version.connector_config|tojson if version.connector_config else 'null' }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ]{% if not loop.last %},{% endif %}
@@ -214,6 +330,11 @@ function updateAgentVersions() {
         if (agentData[agentSelect.value].length > 0) {
             versionSelect.value = agentData[agentSelect.value][0].id;
         }
+    }
+    
+    // Update connector status if in connector mode
+    if (!document.getElementById('upload_mode').checked) {
+        updateConnectorStatus();
     }
 }
 

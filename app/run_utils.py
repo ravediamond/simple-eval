@@ -8,6 +8,8 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.models import Run, TestCase, MetricResult, AgentVersion, DatasetVersion
+from app.connectors import ConnectorFactory, ConnectorConfig, ConnectorManager
+from app.evaluation_engine import EvaluationEngine
 
 class AnswersProcessor:
     @staticmethod
@@ -147,41 +149,54 @@ class RunProcessor:
     def __init__(self, db: Session):
         self.db = db
     
-    async def start_run(self, run: Run, answers: List[Dict], dataset_rows: List[Dict]) -> None:
-        """Start processing a run with uploaded answers"""
+    async def start_run(self, run: Run, answers: List[Dict] = None, dataset_rows: List[Dict] = None) -> None:
+        """Start processing a run with uploaded answers or live evaluation"""
         try:
             # Update run status
             run.status = "running"
             run.started_at = datetime.utcnow()
-            run.total_test_cases = len(dataset_rows)
-            self.db.commit()
             
-            # Create test cases from dataset and answers
-            answer_map = {str(answer['id']): answer['answer'] for answer in answers}
-            
-            for dataset_row in dataset_rows:
-                case_id = str(dataset_row['id'])
-                actual_answer = answer_map[case_id]
+            if run.evaluation_source == "upload":
+                # Handle uploaded answers workflow
+                if not answers or not dataset_rows:
+                    raise ValueError("Answers and dataset rows required for upload evaluation")
                 
-                test_case = TestCase(
-                    run_id=run.id,
-                    case_id=case_id,
-                    question=dataset_row.get('question', ''),
-                    context=dataset_row.get('context'),
-                    expected_answer=dataset_row.get('expected_answer'),
-                    actual_answer=actual_answer
-                )
-                self.db.add(test_case)
-            
-            self.db.commit()
-            
-            # Process each test case
-            test_cases = self.db.query(TestCase).filter(TestCase.run_id == run.id).all()
-            
-            for test_case in test_cases:
-                await self._process_test_case(test_case, run.agent_version)
-                run.completed_test_cases += 1
+                run.total_test_cases = len(dataset_rows)
                 self.db.commit()
+                
+                # Create test cases from dataset and answers
+                answer_map = {str(answer['id']): answer['answer'] for answer in answers}
+                
+                for dataset_row in dataset_rows:
+                    case_id = str(dataset_row['id'])
+                    actual_answer = answer_map[case_id]
+                    
+                    test_case = TestCase(
+                        run_id=run.id,
+                        case_id=case_id,
+                        question=dataset_row.get('question', ''),
+                        context=dataset_row.get('context'),
+                        expected_answer=dataset_row.get('expected_answer'),
+                        actual_answer=actual_answer
+                    )
+                    self.db.add(test_case)
+                
+                self.db.commit()
+                
+                # Process each test case
+                test_cases = self.db.query(TestCase).filter(TestCase.run_id == run.id).all()
+                
+                for test_case in test_cases:
+                    await self._process_test_case(test_case, run.agent_version)
+                    run.completed_test_cases += 1
+                    self.db.commit()
+            
+            elif run.evaluation_source == "connector":
+                # Handle live evaluation workflow
+                await self._start_live_evaluation(run, dataset_rows)
+            
+            else:
+                raise ValueError(f"Unknown evaluation source: {run.evaluation_source}")
             
             # Calculate aggregates
             self._calculate_run_aggregates(run)
@@ -216,104 +231,139 @@ class RunProcessor:
             self.db.commit()
             raise e
     
+    async def _start_live_evaluation(self, run: Run, dataset_rows: List[Dict]) -> None:
+        """Start live evaluation using connector"""
+        if not dataset_rows:
+            raise ValueError("Dataset rows required for live evaluation")
+        
+        if not run.agent_version.connector_enabled or not run.agent_version.connector_config:
+            raise ValueError("Connector not configured for this agent version")
+        
+        run.total_test_cases = len(dataset_rows)
+        self.db.commit()
+        
+        # Create connector from config
+        connector_config = ConnectorConfig(**run.agent_version.connector_config)
+        connector = ConnectorFactory.create_connector(connector_config)
+        connector_manager = ConnectorManager(max_concurrent=5)
+        
+        async with connector:
+            # Prepare questions for batch evaluation
+            questions = []
+            for dataset_row in dataset_rows:
+                questions.append({
+                    "id": str(dataset_row['id']),
+                    "question": dataset_row.get('question', ''),
+                    "context": dataset_row.get('context')
+                })
+            
+            # Evaluate in batches
+            batch_size = 10
+            for i in range(0, len(questions), batch_size):
+                batch = questions[i:i + batch_size]
+                
+                # Get responses from connector
+                responses = await connector_manager.evaluate_batch(connector, batch)
+                
+                # Create test cases and process them
+                for j, response in enumerate(responses):
+                    dataset_row = dataset_rows[i + j]
+                    case_id = str(dataset_row['id'])
+                    
+                    # Create test case with connector response
+                    test_case = TestCase(
+                        run_id=run.id,
+                        case_id=case_id,
+                        question=dataset_row.get('question', ''),
+                        context=dataset_row.get('context'),
+                        expected_answer=dataset_row.get('expected_answer'),
+                        actual_answer=response.answer if response.success else f"Error: {response.error_message}"
+                    )
+                    self.db.add(test_case)
+                    self.db.flush()  # Get the ID
+                    
+                    # Process test case for scoring
+                    await self._process_test_case(test_case, run.agent_version)
+                    
+                    # Store connector metadata if available
+                    if response.metadata:
+                        # Could store in a separate table or in test case notes
+                        pass
+                    
+                    run.completed_test_cases += 1
+                    self.db.commit()
+    
     async def _process_test_case(self, test_case: TestCase, agent_version: AgentVersion) -> None:
-        """Process a single test case with enabled metrics"""
-        metric_scores = []
+        """Process a single test case with enabled metrics using real evaluation engine"""
         
-        # LLM-as-Judge scoring
-        if agent_version.llm_as_judge_enabled:
-            score, reasoning = await self._score_llm_as_judge(test_case, agent_version)
-            threshold = agent_version.default_thresholds.get('llm_as_judge', 0.8)
-            passed = score >= threshold
-            
-            metric_result = MetricResult(
-                test_case_id=test_case.id,
-                metric_name='llm_as_judge',
-                score=score,
-                passed=passed,
-                threshold=threshold,
-                reasoning=reasoning,
-                execution_time_ms=100  # Mock execution time
+        # Create judge connector config from agent version
+        judge_config = ConnectorConfig(**agent_version.judge_model_config)
+        evaluation_engine = EvaluationEngine(judge_config)
+        
+        # Get thresholds
+        llm_as_judge_threshold = agent_version.default_thresholds.get('llm_as_judge', 0.8)
+        faithfulness_threshold = agent_version.default_thresholds.get('faithfulness', 0.8)
+        
+        try:
+            # Evaluate test case with real metrics
+            metric_results = await evaluation_engine.evaluate_test_case(
+                question=test_case.question,
+                actual_answer=test_case.actual_answer,
+                expected_answer=test_case.expected_answer,
+                context=test_case.context,
+                llm_as_judge_enabled=agent_version.llm_as_judge_enabled,
+                faithfulness_enabled=agent_version.faithfulness_enabled,
+                llm_as_judge_threshold=llm_as_judge_threshold,
+                faithfulness_threshold=faithfulness_threshold,
+                custom_judge_prompt=agent_version.judge_prompt,
+                store_verbose_artifacts=agent_version.store_verbose_artifacts or False
             )
-            self.db.add(metric_result)
-            metric_scores.append(score)
-        
-        # Faithfulness scoring (only if context exists)
-        if agent_version.faithfulness_enabled and test_case.context:
-            score, reasoning = await self._score_faithfulness(test_case, agent_version)
-            threshold = agent_version.default_thresholds.get('faithfulness', 0.8)
-            passed = score >= threshold
             
-            metric_result = MetricResult(
-                test_case_id=test_case.id,
-                metric_name='faithfulness',
-                score=score,
-                passed=passed,
-                threshold=threshold,
-                reasoning=reasoning,
-                execution_time_ms=150  # Mock execution time
-            )
-            self.db.add(metric_result)
-            metric_scores.append(score)
-        
-        # Calculate overall score for test case
-        if metric_scores:
-            test_case.overall_score = sum(metric_scores) / len(metric_scores)
-            test_case.passed = all(
-                result.passed for result in 
-                self.db.query(MetricResult).filter(MetricResult.test_case_id == test_case.id).all()
-            )
-    
-    async def _score_llm_as_judge(self, test_case: TestCase, agent_version: AgentVersion) -> Tuple[float, str]:
-        """Score using LLM-as-Judge (simplified mock implementation)"""
-        # This is a simplified mock implementation
-        # In a real implementation, you would call the judge model API
-        await asyncio.sleep(0.1)  # Simulate API call
-        
-        # Mock scoring logic based on answer length and question match
-        base_score = min(1.0, len(test_case.actual_answer) / 100.0 + 0.5)
-        
-        # Add some variance based on content
-        if "error" in test_case.actual_answer.lower():
-            score = max(0.1, base_score - 0.3)
-            reasoning = "Answer contains error indicators, reducing confidence in response quality."
-        elif len(test_case.actual_answer) < 10:
-            score = max(0.2, base_score - 0.2)
-            reasoning = "Answer is very brief, may lack sufficient detail."
-        elif len(test_case.actual_answer) > 200:
-            score = min(0.9, base_score + 0.1)
-            reasoning = "Answer is comprehensive and detailed, showing good understanding."
-        else:
-            score = base_score
-            reasoning = "Answer length and content appear appropriate for the question."
-        
-        return round(score, 2), reasoning
-    
-    async def _score_faithfulness(self, test_case: TestCase, agent_version: AgentVersion) -> Tuple[float, str]:
-        """Score faithfulness to context (simplified mock implementation)"""
-        # This is a simplified mock implementation
-        # In a real implementation, you would use embedding similarity or other methods
-        await asyncio.sleep(0.1)  # Simulate processing
-        
-        # Mock scoring based on presence of context keywords in answer
-        if test_case.context and test_case.actual_answer:
-            context_words = set(test_case.context.lower().split())
-            answer_words = set(test_case.actual_answer.lower().split())
-            overlap = len(context_words.intersection(answer_words))
-            overlap_ratio = overlap / max(len(context_words), 1)
+            # Store metric results in database
+            metric_scores = []
+            for metric_name, eval_result in metric_results.items():
+                metric_result = MetricResult(
+                    test_case_id=test_case.id,
+                    metric_name=metric_name,
+                    score=eval_result.score,
+                    passed=eval_result.passed,
+                    threshold=eval_result.threshold,
+                    reasoning=eval_result.reasoning,
+                    execution_time_ms=eval_result.execution_time_ms,
+                    raw_judge_response=eval_result.raw_response,
+                    judge_prompt_used=eval_result.prompt_used
+                )
+                self.db.add(metric_result)
+                metric_scores.append(eval_result.score)
             
-            score = min(1.0, overlap_ratio + 0.3)
-            
-            if overlap_ratio > 0.5:
-                reasoning = f"Strong alignment with context. {overlap} key terms from context appear in answer."
-            elif overlap_ratio > 0.2:
-                reasoning = f"Moderate alignment with context. {overlap} terms match but answer could be more grounded."
+            # Calculate overall score and pass status
+            if metric_scores:
+                overall_score, overall_passed = evaluation_engine.calculate_overall_score(metric_results)
+                test_case.overall_score = overall_score
+                test_case.passed = overall_passed
             else:
-                reasoning = f"Limited alignment with context. Only {overlap} terms match, answer may not be well-grounded."
+                test_case.overall_score = 0.0
+                test_case.passed = False
+                
+        except Exception as e:
+            # Handle evaluation failures gracefully
+            print(f"Evaluation failed for test case {test_case.case_id}: {e}")
             
-            return round(score, 2), reasoning
-        
-        return 0.5, "No context provided for faithfulness evaluation."
+            # Create error metric result
+            error_metric = MetricResult(
+                test_case_id=test_case.id,
+                metric_name='evaluation_error',
+                score=0.0,
+                passed=False,
+                threshold=0.8,
+                reasoning=f"Evaluation failed: {str(e)}",
+                execution_time_ms=0
+            )
+            self.db.add(error_metric)
+            
+            test_case.overall_score = 0.0
+            test_case.passed = False
+    
     
     def _calculate_run_aggregates(self, run: Run) -> None:
         """Calculate aggregate metrics for the run"""

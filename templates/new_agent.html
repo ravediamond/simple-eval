@@ -145,6 +145,85 @@
                         <textarea class="form-control" id="judge_prompt" name="judge_prompt" rows="4" placeholder="Enter custom judge prompt (leave blank for default)"></textarea>
                         <div class="form-text">Custom prompt for the LLM judge to evaluate responses</div>
                     </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="store_verbose_artifacts" name="store_verbose_artifacts">
+                            <label class="form-check-label" for="store_verbose_artifacts">
+                                Store Verbose Artifacts
+                            </label>
+                        </div>
+                        <div class="form-text">Store judge prompts and raw responses for transparency and debugging</div>
+                    </div>
+
+                    <!-- Connector Configuration -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5>Live Evaluation Connector (Optional)</h5>
+                            <hr>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="connector_enabled" name="connector_enabled" onchange="toggleConnectorConfig()">
+                            <label class="form-check-label" for="connector_enabled">
+                                Enable Live Evaluation
+                            </label>
+                        </div>
+                        <div class="form-text">Allow this agent to evaluate questions directly via API instead of uploading pre-computed answers</div>
+                    </div>
+                    
+                    <div id="connector_config" style="display: none;">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="connector_type" class="form-label">Connector Type</label>
+                                <select class="form-select" id="connector_type" name="connector_type">
+                                    <option value="openai">OpenAI Compatible</option>
+                                    <option value="http">Generic HTTP</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="connector_endpoint" class="form-label">API Endpoint *</label>
+                                <input type="url" class="form-control" id="connector_endpoint" name="connector_endpoint" 
+                                       placeholder="https://api.openai.com/v1/chat/completions">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="connector_api_key" class="form-label">API Key</label>
+                                <input type="password" class="form-control" id="connector_api_key" name="connector_api_key" 
+                                       placeholder="Optional API key">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="connector_model" class="form-label">Model Name</label>
+                                <input type="text" class="form-control" id="connector_model" name="connector_model" 
+                                       placeholder="e.g., gpt-3.5-turbo">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="connector_timeout" class="form-label">Timeout (seconds)</label>
+                                <input type="number" class="form-control" id="connector_timeout" name="connector_timeout" 
+                                       value="30" min="5" max="300">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="connector_rate_limit" class="form-label">Rate Limit (per minute)</label>
+                                <input type="number" class="form-control" id="connector_rate_limit" name="connector_rate_limit" 
+                                       value="60" min="1" max="1000">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">&nbsp;</label>
+                                <button type="button" class="btn btn-outline-info d-block w-100" onclick="testConnection()">
+                                    Test Connection
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="connection_test_result" class="alert" style="display: none;"></div>
+                    </div>
 
                     <!-- Submit -->
                     <div class="row">
@@ -158,4 +237,74 @@
         </div>
     </div>
 </div>
+
+<script>
+// Connector configuration functions
+function toggleConnectorConfig() {
+    const enabled = document.getElementById('connector_enabled').checked;
+    const config = document.getElementById('connector_config');
+    config.style.display = enabled ? 'block' : 'none';
+    
+    // Reset test result when toggling
+    const testResult = document.getElementById('connection_test_result');
+    testResult.style.display = 'none';
+}
+
+function testConnection() {
+    const connectorType = document.getElementById('connector_type').value;
+    const endpoint = document.getElementById('connector_endpoint').value;
+    const apiKey = document.getElementById('connector_api_key').value;
+    const model = document.getElementById('connector_model').value;
+    const timeout = document.getElementById('connector_timeout').value;
+    
+    if (!endpoint) {
+        showTestResult('Please enter an API endpoint', 'danger');
+        return;
+    }
+    
+    // Show loading state
+    const button = document.querySelector('button[onclick="testConnection()"]');
+    const originalText = button.textContent;
+    button.textContent = 'Testing...';
+    button.disabled = true;
+    
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('connector_type', connectorType);
+    formData.append('endpoint_url', endpoint);
+    formData.append('api_key', apiKey);
+    formData.append('model_name', model);
+    formData.append('timeout_seconds', timeout);
+    
+    fetch('/api/test-connector', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showTestResult(
+                `✅ ${data.message}<br><small>Response: "${data.test_answer}" (${data.response_time_ms}ms)</small>`,
+                'success'
+            );
+        } else {
+            showTestResult(`❌ ${data.message}`, 'danger');
+        }
+    })
+    .catch(error => {
+        showTestResult(`❌ Test failed: ${error.message}`, 'danger');
+    })
+    .finally(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+    });
+}
+
+function showTestResult(message, type) {
+    const testResult = document.getElementById('connection_test_result');
+    testResult.className = `alert alert-${type}`;
+    testResult.innerHTML = message;
+    testResult.style.display = 'block';
+}
+</script>
 {% endblock %}

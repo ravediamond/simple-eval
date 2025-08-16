@@ -12,6 +12,7 @@ from app.models import Dataset, DatasetVersion, Agent, AgentVersion, Run, TestCa
 from app.dataset_utils import DatasetProcessor
 from app.run_utils import AnswersProcessor, RunProcessor
 from app.export_utils import RunExporter, ResultsFilter
+from app.connectors import ConnectorFactory, ConnectorConfig
 
 load_dotenv()
 
@@ -195,6 +196,16 @@ async def create_agent(
     judge_model_name: str = Form("gpt-4"),
     judge_temperature: float = Form(0.0),
     judge_prompt: str = Form(""),
+    # Connector fields
+    connector_enabled: bool = Form(False),
+    connector_type: str = Form("openai"),
+    connector_endpoint: str = Form(""),
+    connector_api_key: str = Form(""),
+    connector_model: str = Form(""),
+    connector_timeout: int = Form(30),
+    connector_rate_limit: int = Form(60),
+    # Evaluation settings
+    store_verbose_artifacts: bool = Form(False),
     db: Session = Depends(get_db)
 ):
     """Create a new agent"""
@@ -232,6 +243,20 @@ async def create_agent(
         
         default_judge_prompt = judge_prompt or "Please evaluate the following response for quality and accuracy. Rate from 0 to 1 where 1 is excellent and 0 is poor."
         
+        # Configure connector if enabled
+        connector_config_dict = None
+        if connector_enabled and connector_endpoint:
+            connector_config_dict = {
+                "connector_type": connector_type,
+                "endpoint_url": connector_endpoint,
+                "api_key": connector_api_key if connector_api_key else None,
+                "model_name": connector_model if connector_model else None,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "timeout_seconds": connector_timeout,
+                "rate_limit_per_minute": connector_rate_limit
+            }
+        
         version = AgentVersion(
             agent_id=agent.id,
             version_number=1,
@@ -241,7 +266,10 @@ async def create_agent(
             faithfulness_enabled=faithfulness_enabled,
             default_thresholds=default_thresholds,
             judge_model_config=judge_model_config,
-            judge_prompt=default_judge_prompt
+            judge_prompt=default_judge_prompt,
+            connector_enabled=connector_enabled,
+            connector_config=connector_config_dict,
+            store_verbose_artifacts=store_verbose_artifacts
         )
         db.add(version)
         db.commit()
@@ -266,6 +294,55 @@ async def agent_detail(request: Request, agent_id: int, db: Session = Depends(ge
         "request": request,
         "agent": agent
     })
+
+@app.post("/api/test-connector")
+async def test_connector(
+    request: Request,
+    connector_type: str = Form(...),
+    endpoint_url: str = Form(...),
+    api_key: str = Form(""),
+    model_name: str = Form(""),
+    temperature: float = Form(0.7),
+    max_tokens: int = Form(100),
+    timeout_seconds: int = Form(10)
+):
+    """Test a connector configuration"""
+    try:
+        config = ConnectorConfig(
+            connector_type=connector_type,
+            endpoint_url=endpoint_url,
+            api_key=api_key if api_key else None,
+            model_name=model_name if model_name else None,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout_seconds=timeout_seconds,
+            max_retries=1  # Fast test
+        )
+        
+        connector = ConnectorFactory.create_connector(config)
+        
+        async with connector:
+            # Test with a simple question
+            response = await connector.evaluate("What is 2+2? Answer briefly.")
+            
+            if response.success:
+                return JSONResponse({
+                    "success": True,
+                    "message": "Connection successful!",
+                    "test_answer": response.answer,
+                    "response_time_ms": response.response_time_ms
+                })
+            else:
+                return JSONResponse({
+                    "success": False,
+                    "message": f"Connection failed: {response.error_message}"
+                })
+    
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "message": f"Test failed: {str(e)}"
+        })
 
 @app.get("/runs", response_class=HTMLResponse)
 async def runs(request: Request, db: Session = Depends(get_db)):
@@ -293,45 +370,81 @@ async def upload_run_answers(
     name: str = Form(...),
     agent_version_id: int = Form(...),
     dataset_version_id: int = Form(...),
-    file: UploadFile = File(...),
+    evaluation_source: str = Form("upload"),
+    file: UploadFile = File(None),
     db: Session = Depends(get_db)
 ):
-    """Handle answers file upload and validation"""
-    try:
-        # Read file content
-        content = await file.read()
-        content_str = content.decode('utf-8')
-    except Exception as e:
-        return templates.TemplateResponse("new_run.html", {
-            "request": request,
-            "error": f"Error reading file: {str(e)}"
-        })
+    """Handle run creation with upload or connector evaluation"""
+    
+    # Handle file reading for upload mode
+    answers = []
+    if evaluation_source == "upload":
+        if not file:
+            agents = db.query(Agent).all()
+            datasets = db.query(Dataset).all()
+            return templates.TemplateResponse("new_run.html", {
+                "request": request,
+                "error": "Answers file is required for upload mode",
+                "agents": agents,
+                "datasets": datasets
+            })
+        
+        try:
+            content = await file.read()
+            content_str = content.decode('utf-8')
+        except Exception as e:
+            agents = db.query(Agent).all()
+            datasets = db.query(Dataset).all()
+            return templates.TemplateResponse("new_run.html", {
+                "request": request,
+                "error": f"Error reading file: {str(e)}",
+                "agents": agents,
+                "datasets": datasets
+            })
     
     # Get agent and dataset versions
     agent_version = db.query(AgentVersion).filter(AgentVersion.id == agent_version_id).first()
     dataset_version = db.query(DatasetVersion).filter(DatasetVersion.id == dataset_version_id).first()
     
     if not agent_version or not dataset_version:
-        return templates.TemplateResponse("new_run.html", {
-            "request": request,
-            "error": "Invalid agent or dataset version selected"
-        })
-    
-    # Process answers file
-    answers, errors = AnswersProcessor.process_answers_file(content_str, file.filename)
-    
-    if errors:
         agents = db.query(Agent).all()
         datasets = db.query(Dataset).all()
         return templates.TemplateResponse("new_run.html", {
             "request": request,
-            "errors": errors,
+            "error": "Invalid agent or dataset version selected",
             "agents": agents,
-            "datasets": datasets,
-            "name": name,
-            "selected_agent_version": agent_version_id,
-            "selected_dataset_version": dataset_version_id
+            "datasets": datasets
         })
+    
+    # Validate connector configuration for connector mode
+    if evaluation_source == "connector":
+        if not agent_version.connector_enabled or not agent_version.connector_config:
+            agents = db.query(Agent).all()
+            datasets = db.query(Dataset).all()
+            return templates.TemplateResponse("new_run.html", {
+                "request": request,
+                "error": "Selected agent does not have connector configured",
+                "agents": agents,
+                "datasets": datasets
+            })
+    
+    # Process answers file for upload mode
+    errors = []
+    if evaluation_source == "upload":
+        answers, errors = AnswersProcessor.process_answers_file(content_str, file.filename)
+        
+        if errors:
+            agents = db.query(Agent).all()
+            datasets = db.query(Dataset).all()
+            return templates.TemplateResponse("new_run.html", {
+                "request": request,
+                "errors": errors,
+                "agents": agents,
+                "datasets": datasets,
+                "name": name,
+                "selected_agent_version": agent_version_id,
+                "selected_dataset_version": dataset_version_id
+            })
     
     # Load dataset rows for validation
     try:
@@ -345,20 +458,21 @@ async def upload_run_answers(
             "error": f"Error reading dataset: {str(e)}"
         })
     
-    # Validate 100% coverage
-    coverage_errors = AnswersProcessor.validate_coverage(answers, dataset_rows)
-    if coverage_errors:
-        agents = db.query(Agent).all()
-        datasets = db.query(Dataset).all()
-        return templates.TemplateResponse("new_run.html", {
-            "request": request,
-            "errors": coverage_errors,
-            "agents": agents,
-            "datasets": datasets,
-            "name": name,
-            "selected_agent_version": agent_version_id,
-            "selected_dataset_version": dataset_version_id
-        })
+    # Validate 100% coverage for upload mode
+    if evaluation_source == "upload":
+        coverage_errors = AnswersProcessor.validate_coverage(answers, dataset_rows)
+        if coverage_errors:
+            agents = db.query(Agent).all()
+            datasets = db.query(Dataset).all()
+            return templates.TemplateResponse("new_run.html", {
+                "request": request,
+                "errors": coverage_errors,
+                "agents": agents,
+                "datasets": datasets,
+                "name": name,
+                "selected_agent_version": agent_version_id,
+                "selected_dataset_version": dataset_version_id
+            })
     
     # Create run
     try:
@@ -366,7 +480,8 @@ async def upload_run_answers(
             name=name,
             agent_version_id=agent_version_id,
             dataset_version_id=dataset_version_id,
-            status="pending"
+            status="pending",
+            evaluation_source=evaluation_source
         )
         db.add(run)
         db.commit()
@@ -384,7 +499,10 @@ async def upload_run_answers(
             bg_db = SessionLocal()
             try:
                 run_processor = RunProcessor(bg_db)
-                loop.run_until_complete(run_processor.start_run(run, answers, dataset_rows))
+                if evaluation_source == "upload":
+                    loop.run_until_complete(run_processor.start_run(run, answers, dataset_rows))
+                else:  # connector
+                    loop.run_until_complete(run_processor.start_run(run, dataset_rows=dataset_rows))
             finally:
                 bg_db.close()
                 loop.close()

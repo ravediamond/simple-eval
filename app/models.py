@@ -81,6 +81,13 @@ class AgentVersion(Base):
     # Editable judge prompt
     judge_prompt = Column(Text)
     
+    # Connector configuration for live evaluation
+    connector_enabled = Column(Boolean, default=False)
+    connector_config = Column(JSON)  # ConnectorConfig as JSON
+    
+    # Evaluation configuration
+    store_verbose_artifacts = Column(Boolean, default=False)  # Store judge prompts/responses
+    
     # Relationship to agent
     agent = relationship("Agent", back_populates="versions")
     
@@ -98,6 +105,7 @@ class Run(Base):
     
     # Run status and metadata
     status = Column(String, default="pending")  # pending, running, completed, failed
+    evaluation_source = Column(String, default="upload")  # upload, connector
     total_test_cases = Column(Integer, default=0)
     completed_test_cases = Column(Integer, default=0)
     
@@ -159,6 +167,10 @@ class MetricResult(Base):
     # Additional metadata
     reasoning = Column(Text)  # Judge reasoning if available
     execution_time_ms = Column(Integer)
+    
+    # Verbose artifacts (optional, for debugging/transparency)
+    raw_judge_response = Column(Text)  # Full raw response from judge
+    judge_prompt_used = Column(Text)  # Actual prompt sent to judge
     
     created_at = Column(DateTime, default=datetime.utcnow)
     
