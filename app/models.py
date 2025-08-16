@@ -87,3 +87,80 @@ class AgentVersion(Base):
     @property
     def display_name(self):
         return f"v{self.version_number}"
+
+class Run(Base):
+    __tablename__ = "runs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    agent_version_id = Column(Integer, ForeignKey("agent_versions.id"), nullable=False)
+    dataset_version_id = Column(Integer, ForeignKey("dataset_versions.id"), nullable=False)
+    
+    # Run status and metadata
+    status = Column(String, default="pending")  # pending, running, completed, failed
+    total_test_cases = Column(Integer, default=0)
+    completed_test_cases = Column(Integer, default=0)
+    
+    # Aggregate results
+    overall_score = Column(Float)
+    pass_rate = Column(Float)
+    aggregate_results = Column(JSON)  # {metric_name: {score: float, passed: bool}}
+    
+    # Timing
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Export artifacts
+    csv_export_path = Column(String)  # Path to CSV export
+    json_export_path = Column(String)  # Path to JSON export
+    html_report_path = Column(String)  # Path to HTML report
+    
+    # Relationships
+    agent_version = relationship("AgentVersion")
+    dataset_version = relationship("DatasetVersion")
+    test_cases = relationship("TestCase", back_populates="run", cascade="all, delete-orphan")
+
+class TestCase(Base):
+    __tablename__ = "test_cases"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, ForeignKey("runs.id"), nullable=False)
+    
+    # Test case data
+    case_id = Column(String, nullable=False)  # From dataset
+    question = Column(Text, nullable=False)
+    context = Column(Text)  # Optional, from dataset
+    expected_answer = Column(Text)  # Optional, from dataset
+    actual_answer = Column(Text, nullable=False)  # From uploaded answers
+    
+    # Overall score for this test case
+    overall_score = Column(Float)
+    passed = Column(Boolean)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    run = relationship("Run", back_populates="test_cases")
+    metric_results = relationship("MetricResult", back_populates="test_case", cascade="all, delete-orphan")
+
+class MetricResult(Base):
+    __tablename__ = "metric_results"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    test_case_id = Column(Integer, ForeignKey("test_cases.id"), nullable=False)
+    
+    # Metric details
+    metric_name = Column(String, nullable=False)  # llm_as_judge, faithfulness
+    score = Column(Float, nullable=False)  # 0.0 to 1.0
+    passed = Column(Boolean, nullable=False)  # Based on threshold
+    threshold = Column(Float, nullable=False)  # Threshold used
+    
+    # Additional metadata
+    reasoning = Column(Text)  # Judge reasoning if available
+    execution_time_ms = Column(Integer)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    test_case = relationship("TestCase", back_populates="metric_results")

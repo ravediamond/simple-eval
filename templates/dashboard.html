@@ -10,6 +10,47 @@
     </div>
 </div>
 
+<!-- Summary Stats -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-primary">{{ total_agents }}</h2>
+                <p class="card-text">Agents</p>
+                <a href="/agents" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-success">{{ total_datasets }}</h2>
+                <p class="card-text">Datasets</p>
+                <a href="/datasets" class="btn btn-sm btn-outline-success">View All</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-info">{{ total_runs }}</h2>
+                <p class="card-text">Runs</p>
+                <a href="/runs" class="btn btn-sm btn-outline-info">View All</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-warning">+</h2>
+                <p class="card-text">New Run</p>
+                <a href="/runs/new" class="btn btn-sm btn-warning">Create</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
 <div class="row mt-4">
     <div class="col-md-4">
         <div class="card">
@@ -40,14 +81,69 @@
     </div>
 </div>
 
+<!-- Recent Runs -->
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5>Recent Activity</h5>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Recent Runs</h5>
+                    <a href="/runs" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
             </div>
             <div class="card-body">
-                <p class="text-muted">No recent runs yet. Start by creating an agent and dataset.</p>
+                {% if recent_runs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Agent</th>
+                                    <th>Dataset</th>
+                                    <th>Status</th>
+                                    <th>Score</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for run in recent_runs %}
+                                <tr>
+                                    <td>
+                                        <a href="/runs/{{ run.id }}" class="text-decoration-none">
+                                            {{ run.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ run.agent_version.agent.name }}</td>
+                                    <td>{{ run.dataset_version.dataset.name }}</td>
+                                    <td>
+                                        {% if run.status == 'completed' %}
+                                            <span class="badge bg-success">Completed</span>
+                                        {% elif run.status == 'running' %}
+                                            <span class="badge bg-primary">Running</span>
+                                        {% elif run.status == 'failed' %}
+                                            <span class="badge bg-danger">Failed</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if run.overall_score is not none %}
+                                            <span class="badge bg-{% if run.overall_score >= 0.8 %}success{% elif run.overall_score >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ "%.2f"|format(run.overall_score) }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ run.created_at.strftime('%m-%d %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted">No runs yet. <a href="/runs/new">Create your first run</a> to start evaluating.</p>
+                {% endif %}
             </div>
         </div>
     </div>

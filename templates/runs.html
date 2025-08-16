@@ -7,7 +7,7 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
             <h1>Runs</h1>
-            <button class="btn btn-primary">New Run</button>
+            <a href="/runs/new" class="btn btn-primary">New Run</a>
         </div>
         <p class="text-muted">View and manage your evaluation runs</p>
     </div>
@@ -15,11 +15,102 @@
 
 <div class="row mt-4">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <p class="text-muted">No evaluation runs yet. Create an agent and dataset first, then start a new run.</p>
+        {% if runs %}
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Agent</th>
+                                    <th>Dataset</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Overall Score</th>
+                                    <th>Pass Rate</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for run in runs %}
+                                <tr>
+                                    <td>
+                                        <a href="/runs/{{ run.id }}" class="text-decoration-none">
+                                            <strong>{{ run.name }}</strong>
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {{ run.agent_version.agent.name }}
+                                        <small class="text-muted">({{ run.agent_version.display_name }})</small>
+                                    </td>
+                                    <td>
+                                        {{ run.dataset_version.dataset.name }}
+                                        <small class="text-muted">({{ run.dataset_version.display_name }})</small>
+                                    </td>
+                                    <td>
+                                        {% if run.status == 'completed' %}
+                                            <span class="badge bg-success">Completed</span>
+                                        {% elif run.status == 'running' %}
+                                            <span class="badge bg-primary">Running</span>
+                                        {% elif run.status == 'failed' %}
+                                            <span class="badge bg-danger">Failed</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if run.total_test_cases > 0 %}
+                                            <div class="progress" style="height: 20px;">
+                                                {% set progress = (run.completed_test_cases / run.total_test_cases * 100) %}
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {{ progress }}%" 
+                                                     aria-valuenow="{{ progress }}" 
+                                                     aria-valuemin="0" aria-valuemax="100">
+                                                    {{ run.completed_test_cases }}/{{ run.total_test_cases }}
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if run.overall_score is not none %}
+                                            <span class="badge bg-{% if run.overall_score >= 0.8 %}success{% elif run.overall_score >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ "%.2f"|format(run.overall_score) }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if run.pass_rate is not none %}
+                                            <span class="badge bg-{% if run.pass_rate >= 0.8 %}success{% elif run.pass_rate >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ "%.1f"|format(run.pass_rate * 100) }}%
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ run.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <a href="/runs/{{ run.id }}" class="btn btn-sm btn-outline-primary">View</a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-        </div>
+        {% else %}
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted">No runs created yet. Create your first run to start evaluating.</p>
+                </div>
+            </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}
