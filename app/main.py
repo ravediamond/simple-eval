@@ -1351,3 +1351,263 @@ async def get_llm_configs(db: Session = Depends(get_db)):
         }
         for config in configs
     ]
+
+# Additional APIs for complete testing flow
+
+@app.post("/api/chatbots/{chatbot_id}/datasets")
+async def upload_dataset_api(
+    chatbot_id: int,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    description: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """API endpoint to upload dataset for a chatbot"""
+    from app.dataset_utils import DatasetProcessor
+    
+    # Get chatbot
+    agent = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    if not agent:
+        return JSONResponse({
+            "success": False,
+            "message": "Chatbot not found"
+        }, status_code=404)
+    
+    # Get latest version
+    latest_version = agent.versions[0] if agent.versions else None
+    if not latest_version:
+        return JSONResponse({
+            "success": False,
+            "message": "Chatbot has no versions"
+        }, status_code=404)
+    
+    try:
+        # Read file content
+        content = await file.read()
+        content_str = content.decode('utf-8')
+        
+        # Process dataset
+        processor = DatasetProcessor()
+        rows, errors = processor.process_file(content_str, file.filename)
+        
+        if errors:
+            return JSONResponse({
+                "success": False,
+                "message": f"Dataset processing errors: {', '.join(errors)}"
+            }, status_code=400)
+        
+        # Save dataset
+        file_path = processor.save_normalized_data(rows, f"chatbot_{chatbot_id}_v{latest_version.version_number}", 1)
+        
+        # Create reference dataset
+        content_hash = ReferenceDataset.generate_content_hash(rows)
+        reference_dataset = ReferenceDataset(
+            agent_version_id=latest_version.id,
+            name=name,
+            description=description,
+            row_count=len(rows),
+            content_hash=content_hash,
+            file_path=file_path
+        )
+        db.add(reference_dataset)
+        db.commit()
+        
+        dataset_id = reference_dataset.id
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Dataset uploaded successfully",
+            "dataset_id": dataset_id,
+            "row_count": len(rows)
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "message": f"Error uploading dataset: {str(e)}"
+        }, status_code=500)
+
+@app.post("/api/runs")
+async def create_run_api(
+    chatbot_id: int = Form(...),
+    dataset_id: int = Form(...),
+    answers_file: UploadFile = File(...),
+    run_name: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """API endpoint to create and execute a run"""
+    from app.run_utils import AnswersProcessor, RunProcessor
+    
+    try:
+        # Validate chatbot and dataset
+        agent = db.query(Agent).filter(Agent.id == chatbot_id).first()
+        if not agent:
+            return JSONResponse({
+                "success": False,
+                "message": "Chatbot not found"
+            }, status_code=404)
+        
+        dataset = db.query(ReferenceDataset).filter(ReferenceDataset.id == dataset_id).first()
+        if not dataset:
+            return JSONResponse({
+                "success": False,
+                "message": "Dataset not found"
+            }, status_code=404)
+        
+        # Process answers file
+        content = await answers_file.read()
+        content_str = content.decode('utf-8')
+        
+        processor = AnswersProcessor()
+        answers, errors = processor.process_answers_file(content_str, answers_file.filename)
+        
+        if errors:
+            return JSONResponse({
+                "success": False,
+                "message": f"Answers processing errors: {', '.join(errors)}"
+            }, status_code=400)
+        
+        # Create run
+        latest_version = agent.versions[0] if agent.versions else None
+        if not latest_version:
+            return JSONResponse({
+                "success": False,
+                "message": "Chatbot has no versions"
+            }, status_code=404)
+        
+        run = Run(
+            name=run_name,
+            agent_version_id=latest_version.id,
+            reference_dataset_id=dataset_id,
+            status="pending",
+            evaluation_source="upload",
+            total_test_cases=len(answers)
+        )
+        db.add(run)
+        db.flush()
+        
+        # Load dataset rows
+        import json
+        with open(dataset.file_path, 'r') as f:
+            dataset_rows = [json.loads(line) for line in f]
+        
+        # Process answers and start evaluation
+        run_processor = RunProcessor(db)
+        await run_processor.start_run(run, answers=answers, dataset_rows=dataset_rows)
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Run created and evaluation started",
+            "run_id": run.id,
+            "status": run.status,
+            "total_test_cases": run.total_test_cases
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "message": f"Error creating run: {str(e)}"
+        }, status_code=500)
+
+@app.get("/api/runs/{run_id}")
+async def get_run_api(run_id: int, db: Session = Depends(get_db)):
+    """API endpoint to get run details and results"""
+    run = db.query(Run).filter(Run.id == run_id).first()
+    if not run:
+        return JSONResponse({
+            "success": False,
+            "message": "Run not found"
+        }, status_code=404)
+    
+    # Get test cases with results
+    test_cases = []
+    for test_case in run.test_cases:
+        metrics = {}
+        for metric in test_case.metric_results:
+            metrics[metric.metric_name] = {
+                "score": metric.score,
+                "passed": metric.passed,
+                "threshold": metric.threshold,
+                "reasoning": metric.reasoning
+            }
+        
+        test_cases.append({
+            "id": test_case.id,
+            "case_id": test_case.case_id,
+            "question": test_case.question,
+            "context": test_case.context,
+            "expected_answer": test_case.expected_answer,
+            "actual_answer": test_case.actual_answer,
+            "overall_score": test_case.overall_score,
+            "passed": test_case.passed,
+            "metrics": metrics
+        })
+    
+    return JSONResponse({
+        "success": True,
+        "run": {
+            "id": run.id,
+            "name": run.name,
+            "status": run.status,
+            "overall_score": run.overall_score,
+            "pass_rate": run.pass_rate,
+            "total_test_cases": run.total_test_cases,
+            "completed_test_cases": run.completed_test_cases,
+            "started_at": run.started_at.isoformat() if run.started_at else None,
+            "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+            "aggregate_results": run.aggregate_results,
+            "test_cases": test_cases
+        }
+    })
+
+@app.get("/api/chatbots/{chatbot_id}")
+async def get_chatbot_api(chatbot_id: int, db: Session = Depends(get_db)):
+    """API endpoint to get chatbot details"""
+    agent = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    if not agent:
+        return JSONResponse({
+            "success": False,
+            "message": "Chatbot not found"
+        }, status_code=404)
+    
+    latest_version = agent.versions[0] if agent.versions else None
+    
+    return JSONResponse({
+        "success": True,
+        "chatbot": {
+            "id": agent.id,
+            "name": agent.name,
+            "description": agent.description,
+            "created_at": agent.created_at.isoformat(),
+            "latest_version": {
+                "id": latest_version.id,
+                "version_number": latest_version.version_number,
+                "model_config": latest_version.model_config,
+                "llm_as_judge_enabled": latest_version.llm_as_judge_enabled,
+                "faithfulness_enabled": latest_version.faithfulness_enabled,
+                "judge_prompt": latest_version.judge_prompt
+            } if latest_version else None,
+            "datasets": [
+                {
+                    "id": dataset.id,
+                    "name": dataset.name,
+                    "description": dataset.description,
+                    "row_count": dataset.row_count,
+                    "created_at": dataset.created_at.isoformat()
+                }
+                for dataset in (latest_version.reference_datasets if latest_version else [])
+            ],
+            "runs": [
+                {
+                    "id": run.id,
+                    "name": run.name,
+                    "status": run.status,
+                    "overall_score": run.overall_score,
+                    "pass_rate": run.pass_rate,
+                    "created_at": run.created_at.isoformat()
+                }
+                for run in (latest_version.runs if latest_version else [])
+            ]
+        }
+    })

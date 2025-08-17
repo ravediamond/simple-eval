@@ -151,6 +151,54 @@ def migrate_database():
             ''')
             migrations_applied.append("llm_configurations table")
         
+        # Migration 7: Make dataset_version_id nullable in runs table
+        cursor.execute("PRAGMA table_info(runs)")
+        runs_columns = {col[1]: col for col in cursor.fetchall()}
+        
+        if 'dataset_version_id' in runs_columns:
+            # Check if dataset_version_id is currently NOT NULL (1)
+            dataset_version_col = runs_columns['dataset_version_id']
+            if dataset_version_col[3] == 1:  # NOT NULL constraint
+                print("Making dataset_version_id nullable in runs table...")
+                # SQLite doesn't support ALTER COLUMN, so we need to recreate the table
+                cursor.execute('''
+                    CREATE TABLE runs_new (
+                        id INTEGER PRIMARY KEY,
+                        name VARCHAR NOT NULL,
+                        agent_version_id INTEGER NOT NULL,
+                        reference_dataset_id INTEGER,
+                        dataset_version_id INTEGER,
+                        status VARCHAR DEFAULT 'pending',
+                        evaluation_source VARCHAR DEFAULT 'upload',
+                        total_test_cases INTEGER DEFAULT 0,
+                        completed_test_cases INTEGER DEFAULT 0,
+                        overall_score FLOAT,
+                        pass_rate FLOAT,
+                        aggregate_results JSON,
+                        threshold_overrides JSON,
+                        started_at DATETIME,
+                        completed_at DATETIME,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        csv_export_path VARCHAR,
+                        json_export_path VARCHAR,
+                        html_report_path VARCHAR,
+                        FOREIGN KEY (agent_version_id) REFERENCES agent_versions(id),
+                        FOREIGN KEY (reference_dataset_id) REFERENCES reference_datasets(id),
+                        FOREIGN KEY (dataset_version_id) REFERENCES dataset_versions(id)
+                    )
+                ''')
+                
+                # Copy data from old table
+                cursor.execute('''
+                    INSERT INTO runs_new SELECT * FROM runs
+                ''')
+                
+                # Drop old table and rename new table
+                cursor.execute('DROP TABLE runs')
+                cursor.execute('ALTER TABLE runs_new RENAME TO runs')
+                
+                migrations_applied.append("dataset_version_id nullable constraint")
+        
         # Commit all changes
         conn.commit()
         
