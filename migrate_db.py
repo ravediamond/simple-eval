@@ -65,6 +65,16 @@ def migrate_database():
             cursor.execute('ALTER TABLE agent_versions ADD COLUMN store_verbose_artifacts BOOLEAN DEFAULT 0')
             migrations_applied.append("store_verbose_artifacts column")
         
+        if 'connector_enabled' not in agent_columns:
+            print("Adding connector_enabled column to agent_versions table...")
+            cursor.execute('ALTER TABLE agent_versions ADD COLUMN connector_enabled BOOLEAN DEFAULT 0')
+            migrations_applied.append("connector_enabled column")
+        
+        if 'connector_config' not in agent_columns:
+            print("Adding connector_config column to agent_versions table...")
+            cursor.execute('ALTER TABLE agent_versions ADD COLUMN connector_config JSON')
+            migrations_applied.append("connector_config column")
+        
         # Migration 3: Add verbose artifact columns to metric_results
         cursor.execute("PRAGMA table_info(metric_results)")
         metric_columns = [col[1] for col in cursor.fetchall()]

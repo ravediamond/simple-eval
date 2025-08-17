@@ -1,0 +1,2 @@
+# This file ensures the data directory is preserved in version control
+# while keeping database files ignored

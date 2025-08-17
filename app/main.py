@@ -45,7 +45,7 @@ async def get_chatbots_list(db: Session = Depends(get_db)):
             "description": bot.description or "",
             "run_count": sum(len(v.runs) for v in bot.versions),
             "dataset_count": sum(len(v.reference_datasets) for v in bot.versions),
-            "latest_version": bot.versions[0].version if bot.versions else "1.0"
+            "latest_version": bot.versions[0].version_number if bot.versions else 1
         }
         for bot in chatbots
     ]
@@ -362,16 +362,12 @@ async def create_chatbot(
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
-    tags: str = Form(""),
     model_provider: str = Form(...),
     model_name: str = Form(...),
-    temperature: float = Form(0.7),
+    temperature: float = Form(0.0),
     max_tokens: int = Form(1000),
     llm_as_judge_enabled: bool = Form(True),
     faithfulness_enabled: bool = Form(True),
-    judge_model_provider: str = Form("openai"),
-    judge_model_name: str = Form("gpt-4"),
-    judge_temperature: float = Form(0.0),
     judge_prompt: str = Form(""),
     # Connector fields
     connector_enabled: bool = Form(False),
@@ -385,21 +381,18 @@ async def create_chatbot(
     store_verbose_artifacts: bool = Form(False),
     db: Session = Depends(get_db)
 ):
-    """Create a new agent"""
+    """Create a new chatbot"""
     try:
-        # Parse tags
-        tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()] if tags else []
-        
-        # Create agent
+        # Create agent (no tags)
         agent = Agent(
             name=name,
             description=description,
-            tags=tag_list
+            tags=[]  # Remove tags support
         )
         db.add(agent)
         db.flush()  # Get the ID
         
-        # Create initial agent version
+        # Create unified model configuration (used for both chatbot and judge)
         model_config = {
             "provider": model_provider,
             "model": model_name,
@@ -407,18 +400,24 @@ async def create_chatbot(
             "max_tokens": max_tokens
         }
         
-        judge_model_config = {
-            "provider": judge_model_provider,
-            "model": judge_model_name,
-            "temperature": judge_temperature
-        }
+        # Use same model config for judge (no separate judge config needed)
+        judge_model_config = model_config.copy()
         
         default_thresholds = {
             "llm_as_judge": 0.8,
             "faithfulness": 0.8
         }
         
-        default_judge_prompt = judge_prompt or "Please evaluate the following response for quality and accuracy. Rate from 0 to 1 where 1 is excellent and 0 is poor."
+        # Default judge prompt
+        default_judge_prompt = judge_prompt or """You are an expert evaluator assessing the quality and correctness of AI responses.
+
+Please evaluate the given response to the question on the following criteria:
+1. Accuracy: Is the response factually correct?
+2. Completeness: Does it fully answer the question?
+3. Clarity: Is it well-written and understandable?
+4. Relevance: Does it directly address what was asked?
+
+Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning."""
         
         # Configure connector if enabled
         connector_config_dict = None
