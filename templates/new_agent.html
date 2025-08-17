@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Create Agent - Simple Eval{% endblock %}
+{% block title %}Create Chatbot - Simple Eval{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Create Agent</h1>
-            <a href="/agents" class="btn btn-outline-secondary">Back to Agents</a>
+            <h1>Create Chatbot</h1>
+            <a href="/chatbots" class="btn btn-outline-secondary">Back to Chatbots</a>
         </div>
-        <p class="text-muted">Define a new evaluation agent with model configuration and metrics</p>
+        <p class="text-muted">Define a new chatbot with model configuration and metrics for evaluation</p>
     </div>
 </div>
 
@@ -21,7 +21,7 @@
                     <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
                 
-                <form method="post" action="/agents">
+                <form method="post" action="/chatbots">
                     <!-- Basic Information -->
                     <div class="row mb-4">
                         <div class="col-12">

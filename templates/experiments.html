@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Chatbots - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        {% if experiments %}
+            <div class="mb-4">
+                <h2>Chatbots</h2>
+                <p class="text-muted">Select a chatbot from the sidebar to view its details, datasets, and evaluations.</p>
+            </div>
+
+            <div class="row">
+                {% for chatbot in experiments %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 chatbot-card" onclick="selectChatbot({{ chatbot.id }}, '{{ chatbot.name }}')">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ chatbot.name }}</h5>
+                            <p class="card-text text-muted">{{ chatbot.description or "No description" }}</p>
+                            
+                            {% if chatbot.tags %}
+                            <div class="mb-3">
+                                {% for tag in chatbot.tags %}
+                                    <span class="badge bg-light text-dark me-1">{{ tag }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            
+                            <div class="row text-center mt-3">
+                                <div class="col-6">
+                                    <div class="text-primary">
+                                        <strong>
+                                            {% if chatbot.versions %}
+                                                {% set latest_version = chatbot.versions[0] %}
+                                                {{ latest_version.reference_datasets|length }}
+                                            {% else %}
+                                                0
+                                            {% endif %}
+                                        </strong>
+                                    </div>
+                                    <small class="text-muted">Datasets</small>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-info">
+                                        <strong>
+                                            {% set run_count = 0 %}
+                                            {% for version in chatbot.versions %}
+                                                {% for run in version.runs if version.runs %}
+                                                    {% set run_count = run_count + 1 %}
+                                                {% endfor %}
+                                            {% endfor %}
+                                            {{ run_count }}
+                                        </strong>
+                                    </div>
+                                    <small class="text-muted">Evaluations</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-light">
+                            <small class="text-muted">
+                                Created {{ chatbot.created_at.strftime('%Y-%m-%d') }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <h2 class="text-muted mb-3">Welcome to Simple Eval</h2>
+                <p class="text-muted mb-4">Create your first chatbot to start evaluating</p>
+                <a href="/chatbots/new" class="btn btn-primary btn-lg">+ Create Your First Chatbot</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.chatbot-card {
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.chatbot-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+</style>
+
+<script>
+function selectChatbot(chatbotId, chatbotName) {
+    // Store selected chatbot in localStorage (like MLflow)
+    localStorage.setItem('selectedChatbot', JSON.stringify({
+        id: chatbotId,
+        name: chatbotName
+    }));
+    
+    // Redirect to chatbot dashboard
+    window.location.href = `/chatbots/${chatbotId}`;
+}
+
+// Update the navbar chatbot selector
+document.addEventListener('DOMContentLoaded', function() {
+    const currentChatbot = JSON.parse(localStorage.getItem('selectedChatbot') || 'null');
+    if (currentChatbot) {
+        document.getElementById('current-experiment').textContent = currentChatbot.name;
+    }
+});
+</script>
+{% endblock %}

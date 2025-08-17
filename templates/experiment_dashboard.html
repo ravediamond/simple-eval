@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}{{ experiment.name }} - Chatbot Dashboard{% endblock %}
+
+{% block content %}
+<!-- Chatbot Header -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <div class="d-flex align-items-center mb-2">
+                    <h1>{{ experiment.name }}</h1>
+                    <span class="badge bg-success ms-3">Selected Chatbot</span>
+                </div>
+                <p class="text-muted">{{ experiment.description or "No description" }}</p>
+            </div>
+            <div>
+                <a href="/chatbots" class="btn btn-outline-secondary me-2">Switch Chatbot</a>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                        + New
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="/chatbots/{{ experiment.id }}/datasets/upload">Upload Dataset</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        {% for dataset in reference_datasets %}
+                        <li><a class="dropdown-item" href="/chatbots/{{ experiment.id }}/datasets/{{ dataset.id }}/run">
+                            Run on {{ dataset.name }}
+                        </a></li>
+                        {% endfor %}
+                        {% if not reference_datasets %}
+                        <li><span class="dropdown-item-text text-muted">Upload dataset first</span></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Experiment Info Summary -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-primary">{{ reference_datasets|length }}</h3>
+                <p class="card-text">Datasets</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-info">{{ runs|length }}</h3>
+                <p class="card-text">Total Runs</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                {% set completed_runs = runs|selectattr('status', 'equalto', 'completed')|list %}
+                <h3 class="text-success">{{ completed_runs|length }}</h3>
+                <p class="card-text">Completed</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                {% if current_version %}
+                    <h3 class="text-secondary">{{ current_version.display_name }}</h3>
+                    <p class="card-text">Current Version</p>
+                {% else %}
+                    <h3 class="text-muted">-</h3>
+                    <p class="card-text">No Version</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Datasets Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Datasets</h5>
+                    <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-sm btn-outline-primary">+ Upload Dataset</a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if reference_datasets %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Dataset Name</th>
+                                    <th>Rows</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dataset in reference_datasets %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ dataset.name }}</strong>
+                                        {% if dataset.description %}
+                                        <br><small class="text-muted">{{ dataset.description }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ dataset.row_count }}</td>
+                                    <td>{{ dataset.created_at.strftime('%Y-%m-%d') }}</td>
+                                    <td>
+                                        <a href="/chatbots/{{ experiment.id }}/datasets/{{ dataset.id }}/run" class="btn btn-sm btn-primary">
+                                            Run Evaluation
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">No datasets uploaded for this experiment yet.</p>
+                        <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-primary">Upload Your First Dataset</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Runs Section (MLflow-style runs table) -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Experiment Runs</h5>
+            </div>
+            <div class="card-body">
+                {% if runs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Run Name</th>
+                                    <th>Dataset</th>
+                                    <th>Status</th>
+                                    <th>Overall Score</th>
+                                    <th>Pass Rate</th>
+                                    <th>Source</th>
+                                    <th>Started</th>
+                                    <th>Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for run in runs %}
+                                <tr onclick="window.location.href='/runs/{{ run.id }}'" style="cursor: pointer;">
+                                    <td>
+                                        <strong>{{ run.name }}</strong>
+                                    </td>
+                                    <td>
+                                        {{ run.dataset.name if run.dataset else 'Unknown' }}
+                                    </td>
+                                    <td>
+                                        {% if run.status == 'completed' %}
+                                            <span class="badge bg-success">Completed</span>
+                                        {% elif run.status == 'running' %}
+                                            <span class="badge bg-primary">Running</span>
+                                        {% elif run.status == 'failed' %}
+                                            <span class="badge bg-danger">Failed</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if run.overall_score is not none %}
+                                            <span class="badge bg-{% if run.overall_score >= 0.8 %}success{% elif run.overall_score >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ "%.3f"|format(run.overall_score) }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if run.pass_rate is not none %}
+                                            {{ "%.1f"|format(run.pass_rate * 100) }}%
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if run.evaluation_source == 'connector' %}primary{% else %}secondary{% endif %}">
+                                            {% if run.evaluation_source == 'connector' %}
+                                                Live
+                                            {% else %}
+                                                Upload
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {{ run.started_at.strftime('%Y-%m-%d %H:%M') if run.started_at else run.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                    </td>
+                                    <td>
+                                        {% if run.started_at and run.completed_at %}
+                                            {% set duration = (run.completed_at - run.started_at).total_seconds() %}
+                                            {% if duration < 60 %}
+                                                {{ "%.0f"|format(duration) }}s
+                                            {% else %}
+                                                {{ "%.1f"|format(duration/60) }}m
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="/runs/{{ run.id }}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation()">
+                                            View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <p class="text-muted">No runs yet. Upload a dataset and run your first evaluation!</p>
+                        {% if reference_datasets %}
+                            <div class="btn-group">
+                                {% for dataset in reference_datasets %}
+                                <a href="/chatbots/{{ experiment.id }}/datasets/{{ dataset.id }}/run" class="btn btn-primary">
+                                    Run on {{ dataset.name }}
+                                </a>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-primary">Upload Dataset First</a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Update navbar to show current experiment
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('current-experiment').textContent = '{{ experiment.name }}';
+    
+    // Store in localStorage for consistency
+    localStorage.setItem('selectedExperiment', JSON.stringify({
+        id: {{ experiment.id }},
+        name: '{{ experiment.name }}'
+    }));
+});
+</script>
+{% endblock %}

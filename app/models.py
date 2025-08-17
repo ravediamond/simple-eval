@@ -6,6 +6,29 @@ import json
 
 from app.database import Base
 
+# Reference datasets are now linked to specific agent versions
+class ReferenceDataset(Base):
+    __tablename__ = "reference_datasets"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    agent_version_id = Column(Integer, ForeignKey("agent_versions.id"), nullable=False)
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    row_count = Column(Integer, nullable=False)
+    content_hash = Column(String, nullable=False)  # SHA256 of normalized content
+    file_path = Column(String, nullable=False)  # Path to stored JSONL file
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationship to agent version
+    agent_version = relationship("AgentVersion", back_populates="reference_datasets")
+    
+    @staticmethod
+    def generate_content_hash(rows):
+        """Generate SHA256 hash of normalized row data"""
+        content = json.dumps(rows, sort_keys=True, separators=(',', ':'))
+        return hashlib.sha256(content.encode()).hexdigest()
+
+# Legacy models kept for backward compatibility during migration
 class Dataset(Base):
     __tablename__ = "datasets"
     
@@ -88,8 +111,10 @@ class AgentVersion(Base):
     # Evaluation configuration
     store_verbose_artifacts = Column(Boolean, default=False)  # Store judge prompts/responses
     
-    # Relationship to agent
+    # Relationships
     agent = relationship("Agent", back_populates="versions")
+    reference_datasets = relationship("ReferenceDataset", back_populates="agent_version", cascade="all, delete-orphan")
+    runs = relationship("Run", foreign_keys="Run.agent_version_id", back_populates="agent_version")
     
     @property
     def display_name(self):
@@ -101,7 +126,8 @@ class Run(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     agent_version_id = Column(Integer, ForeignKey("agent_versions.id"), nullable=False)
-    dataset_version_id = Column(Integer, ForeignKey("dataset_versions.id"), nullable=False)
+    reference_dataset_id = Column(Integer, ForeignKey("reference_datasets.id"), nullable=True)  # Nullable for backward compatibility
+    dataset_version_id = Column(Integer, ForeignKey("dataset_versions.id"), nullable=True)  # Legacy field
     
     # Run status and metadata
     status = Column(String, default="pending")  # pending, running, completed, failed
@@ -129,8 +155,14 @@ class Run(Base):
     
     # Relationships
     agent_version = relationship("AgentVersion")
-    dataset_version = relationship("DatasetVersion")
+    reference_dataset = relationship("ReferenceDataset")
+    dataset_version = relationship("DatasetVersion")  # Legacy field
     test_cases = relationship("TestCase", back_populates="run", cascade="all, delete-orphan")
+    
+    @property
+    def dataset(self):
+        """Get the dataset for this run (new or legacy)"""
+        return self.reference_dataset or self.dataset_version
 
 class TestCase(Base):
     __tablename__ = "test_cases"

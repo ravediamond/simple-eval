@@ -12,70 +12,102 @@
 
 <!-- Summary Stats -->
 <div class="row mt-4">
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
                 <h2 class="text-primary">{{ total_agents }}</h2>
-                <p class="card-text">Agents</p>
-                <a href="/agents" class="btn btn-sm btn-outline-primary">View All</a>
+                <p class="card-text">Chatbots</p>
+                <a href="/chatbots" class="btn btn-sm btn-outline-primary">View All</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
                 <h2 class="text-success">{{ total_datasets }}</h2>
                 <p class="card-text">Datasets</p>
-                <a href="/datasets" class="btn btn-sm btn-outline-success">View All</a>
+                <a href="/chatbots" class="btn btn-sm btn-outline-success">View All</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
                 <h2 class="text-info">{{ total_runs }}</h2>
-                <p class="card-text">Runs</p>
-                <a href="/runs" class="btn btn-sm btn-outline-info">View All</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-warning">+</h2>
-                <p class="card-text">New Run</p>
-                <a href="/runs/new" class="btn btn-sm btn-warning">Create</a>
+                <p class="card-text">Evaluations</p>
+                <a href="/chatbots" class="btn btn-sm btn-outline-info">Start New</a>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Quick Actions -->
+<!-- Quick Start Guide -->
 <div class="row mt-4">
-    <div class="col-md-4">
+    <div class="col-md-8">
         <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Start Guide</h5>
+            </div>
             <div class="card-body">
-                <h5 class="card-title">Agents</h5>
-                <p class="card-text">Manage your evaluation agents and their configurations.</p>
-                <a href="/agents" class="btn btn-primary">View Agents</a>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <div class="display-6">🤖</div>
+                            <h6>1. Create Chatbot</h6>
+                            <p class="small text-muted">Define what you want to test</p>
+                            <a href="/chatbots/new" class="btn btn-sm btn-primary">Create Chatbot</a>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <div class="display-6">📊</div>
+                            <h6>2. Upload Dataset</h6>
+                            <p class="small text-muted">Questions & reference answers</p>
+                            <a href="/datasets/upload" class="btn btn-sm btn-success">Upload Dataset</a>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center mb-3">
+                            <div class="display-6">🚀</div>
+                            <h6>3. Start Evaluation</h6>
+                            <p class="small text-muted">Test & get detailed results</p>
+                            <a href="/chatbots" class="btn btn-sm btn-info">Choose Chatbot</a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+    
     <div class="col-md-4">
         <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Datasets</h5>
-                <p class="card-text">Upload and manage your evaluation datasets.</p>
-                <a href="/datasets" class="btn btn-primary">View Datasets</a>
+            <div class="card-header">
+                <h5 class="mb-0">Recent Activity</h5>
             </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Runs</h5>
-                <p class="card-text">View and manage your evaluation runs.</p>
-                <a href="/runs" class="btn btn-primary">View Runs</a>
+                {% if recent_runs %}
+                    {% for run in recent_runs[:3] %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <small><strong>{{ run.agent_version.agent.name }}</strong></small><br>
+                            <small class="text-muted">vs {{ run.dataset_version.dataset.name }}</small>
+                        </div>
+                        <div>
+                            {% if run.status == 'completed' %}
+                                <span class="badge bg-success">Done</span>
+                            {% elif run.status == 'running' %}
+                                <span class="badge bg-primary">Running</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Pending</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <a href="/chatbots" class="btn btn-sm btn-outline-primary w-100 mt-2">View All Chatbots</a>
+                {% else %}
+                    <p class="text-muted small">No evaluations yet. Start by creating a chatbot!</p>
+                    <a href="/chatbots/new" class="btn btn-sm btn-primary w-100">Create First Chatbot</a>
+                {% endif %}
             </div>
         </div>
     </div>

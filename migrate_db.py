@@ -88,6 +88,30 @@ def migrate_database():
             cursor.execute('ALTER TABLE runs ADD COLUMN threshold_overrides JSON')
             migrations_applied.append("threshold_overrides column")
         
+        if 'reference_dataset_id' not in runs_columns:
+            print("Adding reference_dataset_id column to runs table...")
+            cursor.execute('ALTER TABLE runs ADD COLUMN reference_dataset_id INTEGER')
+            migrations_applied.append("reference_dataset_id column")
+        
+        # Migration 5: Create reference_datasets table
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='reference_datasets'")
+        if not cursor.fetchone():
+            print("Creating reference_datasets table...")
+            cursor.execute('''
+                CREATE TABLE reference_datasets (
+                    id INTEGER PRIMARY KEY,
+                    agent_version_id INTEGER NOT NULL,
+                    name VARCHAR NOT NULL,
+                    description TEXT,
+                    row_count INTEGER NOT NULL,
+                    content_hash VARCHAR NOT NULL,
+                    file_path VARCHAR NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (agent_version_id) REFERENCES agent_versions(id)
+                )
+            ''')
+            migrations_applied.append("reference_datasets table")
+        
         # Commit all changes
         conn.commit()
         

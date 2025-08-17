@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}{{ agent.name }} - Chatbot Details{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="/chatbots">Chatbots</a></li>
+                        <li class="breadcrumb-item active">{{ agent.name }}</li>
+                    </ol>
+                </nav>
+                <h1>{{ agent.name }}</h1>
+                <p class="text-muted">{{ agent.description or "No description" }}</p>
+            </div>
+            <div>
+                <a href="/chatbots/new" class="btn btn-outline-primary">Create New Version</a>
+                <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    + New Evaluation
+                </button>
+                <ul class="dropdown-menu">
+                    {% for dataset in reference_datasets %}
+                    <li><a class="dropdown-item" href="/chatbots/{{ agent.id }}/datasets/{{ dataset.id }}/run">
+                        {{ dataset.name }}
+                    </a></li>
+                    {% endfor %}
+                    {% if not reference_datasets %}
+                    <li><span class="dropdown-item-text text-muted">No datasets uploaded yet</span></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="/chatbots/{{ agent.id }}/datasets/upload">Upload Dataset</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chatbot Info Card -->
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Current Configuration</h5>
+            </div>
+            <div class="card-body">
+                {% if agent.versions %}
+                {% set latest_version = agent.versions[0] %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>Version:</strong></td>
+                                <td><span class="badge bg-info">{{ latest_version.display_name }}</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Model:</strong></td>
+                                <td>{{ latest_version.model_config.provider }}/{{ latest_version.model_config.model }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Temperature:</strong></td>
+                                <td>{{ latest_version.model_config.temperature }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Max Tokens:</strong></td>
+                                <td>{{ latest_version.model_config.max_tokens }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>LLM as Judge:</strong></td>
+                                <td>
+                                    {% if latest_version.llm_as_judge_enabled %}
+                                        <span class="badge bg-success">Enabled</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Disabled</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Faithfulness:</strong></td>
+                                <td>
+                                    {% if latest_version.faithfulness_enabled %}
+                                        <span class="badge bg-success">Enabled</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Disabled</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Connector:</strong></td>
+                                <td>
+                                    {% if latest_version.connector_enabled %}
+                                        <span class="badge bg-primary">Live Evaluation</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Upload Only</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Created:</strong></td>
+                                <td>{{ latest_version.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">No versions configured yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Tags</h5>
+            </div>
+            <div class="card-body">
+                {% if agent.tags %}
+                    {% for tag in agent.tags %}
+                        <span class="badge bg-secondary me-1 mb-1">{{ tag }}</span>
+                    {% endfor %}
+                {% else %}
+                    <span class="text-muted">No tags</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Datasets for This Chatbot -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Datasets</h5>
+                    <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-sm btn-outline-primary">+ Upload New Dataset</a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if reference_datasets %}
+                <div class="row">
+                    {% for dataset in reference_datasets %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card border">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ dataset.name }}</h6>
+                                <p class="card-text text-muted small">{{ dataset.description or "No description" }}</p>
+                                <div class="text-muted small mb-2">
+                                    <strong>Rows:</strong> {{ dataset.row_count }}<br>
+                                    <strong>Created:</strong> {{ dataset.created_at.strftime('%Y-%m-%d') }}
+                                </div>
+                                <a href="/chatbots/{{ agent.id }}/datasets/{{ dataset.id }}/run" class="btn btn-sm btn-primary">
+                                    Start Evaluation
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted">No reference datasets uploaded for this chatbot version yet.</p>
+                    {% if current_version %}
+                        <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-primary">Upload Your First Dataset</a>
+                    {% else %}
+                        <p class="text-muted small">Create a chatbot version first to upload datasets.</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Evaluations -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Evaluations</h5>
+            </div>
+            <div class="card-body">
+                {% if runs %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Run Name</th>
+                                <th>Dataset</th>
+                                <th>Status</th>
+                                <th>Overall Score</th>
+                                <th>Pass Rate</th>
+                                <th>Source</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for run in runs %}
+                            <tr>
+                                <td>
+                                    <a href="/runs/{{ run.id }}" class="text-decoration-none">
+                                        <strong>{{ run.name }}</strong>
+                                    </a>
+                                </td>
+                                <td>{{ run.dataset_version.dataset.name }}</td>
+                                <td>
+                                    {% if run.status == 'completed' %}
+                                        <span class="badge bg-success">Completed</span>
+                                    {% elif run.status == 'running' %}
+                                        <span class="badge bg-primary">Running</span>
+                                    {% elif run.status == 'failed' %}
+                                        <span class="badge bg-danger">Failed</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if run.overall_score is not none %}
+                                        <span class="badge bg-{% if run.overall_score >= 0.8 %}success{% elif run.overall_score >= 0.6 %}warning{% else %}danger{% endif %}">
+                                            {{ "%.2f"|format(run.overall_score) }}
+                                        </span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if run.pass_rate is not none %}
+                                        {{ "%.1f"|format(run.pass_rate * 100) }}%
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if run.evaluation_source == 'connector' %}primary{% else %}secondary{% endif %}">
+                                        {% if run.evaluation_source == 'connector' %}
+                                            🔌 Live
+                                        {% else %}
+                                            📁 Upload
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ run.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <a href="/runs/{{ run.id }}" class="btn btn-sm btn-outline-primary">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <p class="text-muted">No evaluation runs yet. Start your first evaluation with a dataset above.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Chatbots - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Chatbots</h1>
+            <a href="/chatbots/new" class="btn btn-primary">+ Create New Chatbot</a>
+        </div>
+        <p class="text-muted">Choose a chatbot to view its datasets and evaluation runs</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        {% if agents %}
+            <div class="row">
+                {% for agent in agents %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 chatbot-card" onclick="location.href='/chatbots/{{ agent.id }}'">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title mb-0">{{ agent.name }}</h5>
+                                {% if agent.versions %}
+                                    <span class="badge bg-info">{{ agent.versions[0].display_name }}</span>
+                                {% endif %}
+                            </div>
+                            
+                            <p class="card-text text-muted">
+                                {{ agent.description or "No description" }}
+                            </p>
+                            
+                            {% if agent.tags %}
+                            <div class="mb-3">
+                                {% for tag in agent.tags %}
+                                    <span class="badge bg-secondary me-1">{{ tag }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            
+                            {% if agent.versions %}
+                            <div class="text-muted small mb-2">
+                                <strong>Latest Model:</strong> {{ agent.versions[0].model_config.provider }}/{{ agent.versions[0].model_config.model }}
+                            </div>
+                            {% endif %}
+                            
+                            <div class="text-muted small">
+                                Created: {{ agent.created_at.strftime('%Y-%m-%d') }}
+                            </div>
+                        </div>
+                        <div class="card-footer bg-light">
+                            <div class="d-flex justify-content-between text-muted small">
+                                <span>📊 Datasets: ?</span>
+                                <span>🏃 Runs: ?</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="card text-center py-5">
+                <div class="card-body">
+                    <h4 class="text-muted">No Chatbots Yet</h4>
+                    <p class="text-muted">Create your first chatbot to start evaluating</p>
+                    <a href="/chatbots/new" class="btn btn-primary">+ Create Your First Chatbot</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.chatbot-card {
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.chatbot-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.chatbot-card:active {
+    transform: translateY(0);
+}
+</style>
+{% endblock %}

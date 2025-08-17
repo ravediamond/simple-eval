@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 from app.database import init_db, get_db
-from app.models import Dataset, DatasetVersion, Agent, AgentVersion, Run, TestCase, MetricResult
+from app.models import Dataset, DatasetVersion, Agent, AgentVersion, Run, TestCase, MetricResult, ReferenceDataset
 from app.dataset_utils import DatasetProcessor
 from app.run_utils import AnswersProcessor, RunProcessor
 from app.export_utils import RunExporter, ResultsFilter
@@ -34,30 +34,52 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "ok", "service": "simple-eval"}
 
+@app.get("/api/chatbots")
+async def get_chatbots_list(db: Session = Depends(get_db)):
+    """Get chatbots list for sidebar"""
+    chatbots = db.query(Agent).all()
+    return [
+        {
+            "id": bot.id,
+            "name": bot.name,
+            "description": bot.description or "",
+            "run_count": sum(len(v.runs) for v in bot.versions),
+            "dataset_count": sum(len(v.reference_datasets) for v in bot.versions),
+            "latest_version": bot.versions[0].version if bot.versions else "1.0"
+        }
+        for bot in chatbots
+    ]
+
 @app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """Main entry point - redirect to chatbots (like MLflow)"""
+    return RedirectResponse(url="/chatbots", status_code=302)
+
+@app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
-    """Main dashboard page"""
-    # Get recent runs for dashboard
-    recent_runs = db.query(Run).order_by(Run.created_at.desc()).limit(5).all()
-    
-    # Get summary stats
-    total_agents = db.query(Agent).count()
-    total_datasets = db.query(Dataset).count()
-    total_runs = db.query(Run).count()
-    
-    return templates.TemplateResponse("dashboard.html", {
+    """Legacy dashboard page - redirect to chatbots"""
+    return RedirectResponse(url="/chatbots", status_code=302)
+
+@app.get("/chatbots", response_class=HTMLResponse)
+async def chatbots_page(request: Request, db: Session = Depends(get_db)):
+    """Chatbots page - main entry point (like MLflow)"""
+    agents = db.query(Agent).all()
+    return templates.TemplateResponse("experiments.html", {
         "request": request,
-        "recent_runs": recent_runs,
-        "total_agents": total_agents,
-        "total_datasets": total_datasets,
-        "total_runs": total_runs
+        "experiments": agents  # Template still uses experiments variable
     })
+
+@app.get("/experiments", response_class=HTMLResponse)
+async def experiments_redirect(request: Request):
+    """Legacy redirect to chatbots"""
+    return RedirectResponse(url="/chatbots", status_code=302)
+
 
 @app.get("/agents", response_class=HTMLResponse)
 async def agents(request: Request, db: Session = Depends(get_db)):
-    """Agents page"""
+    """Legacy redirect to chatbots"""
     agents = db.query(Agent).all()
-    return templates.TemplateResponse("agents.html", {
+    return templates.TemplateResponse("chatbots.html", {
         "request": request,
         "agents": agents
     })
@@ -71,10 +93,124 @@ async def datasets(request: Request, db: Session = Depends(get_db)):
         "datasets": datasets
     })
 
+@app.get("/chatbots/{chatbot_id}/datasets/upload", response_class=HTMLResponse)
+async def upload_dataset_for_chatbot(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
+    """Upload reference dataset form for specific chatbot"""
+    chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Chatbot not found")
+    
+    # Get current version
+    current_version = chatbot.versions[0] if chatbot.versions else None
+    if not current_version:
+        raise HTTPException(status_code=400, detail="Chatbot has no versions. Create a version first.")
+    
+    return templates.TemplateResponse("upload_dataset_focused.html", {
+        "request": request,
+        "chatbot": chatbot,
+        "agent": chatbot,  # For backward compatibility with template
+        "current_version": current_version
+    })
+
+@app.get("/experiments/{experiment_id}/datasets/upload", response_class=HTMLResponse)
+async def upload_dataset_for_experiment_legacy(request: Request, experiment_id: int, db: Session = Depends(get_db)):
+    """Legacy redirect to chatbot dataset upload"""
+    return RedirectResponse(url=f"/chatbots/{experiment_id}/datasets/upload", status_code=302)
+
 @app.get("/datasets/upload", response_class=HTMLResponse)
 async def upload_dataset_form(request: Request):
-    """Upload dataset form"""
-    return templates.TemplateResponse("upload_dataset.html", {"request": request})
+    """Legacy upload dataset form - redirect to chatbots"""
+    return RedirectResponse(url="/chatbots", status_code=302)
+
+@app.post("/chatbots/{chatbot_id}/datasets/upload")
+async def upload_reference_dataset_for_chatbot(
+    request: Request,
+    chatbot_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload reference dataset for specific chatbot"""
+    # Get chatbot and current version
+    chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Chatbot not found")
+    
+    current_version = chatbot.versions[0] if chatbot.versions else None
+    if not current_version:
+        return templates.TemplateResponse("upload_dataset_focused.html", {
+            "request": request,
+            "chatbot": chatbot,
+            "agent": chatbot,
+            "error": "Chatbot has no versions. Create a version first."
+        })
+    
+    # Read and process file (same logic as before)
+    try:
+        content = await file.read()
+        content_str = content.decode('utf-8')
+    except Exception as e:
+        return templates.TemplateResponse("upload_dataset_focused.html", {
+            "request": request,
+            "chatbot": chatbot,
+            "agent": chatbot,
+            "current_version": current_version,
+            "error": f"Error reading file: {str(e)}"
+        })
+    
+    # Process file
+    rows, errors = DatasetProcessor.process_file(content_str, file.filename)
+    
+    # Check for duplicate IDs
+    if rows:
+        duplicate_errors = DatasetProcessor.check_duplicate_ids(rows)
+        errors.extend(duplicate_errors)
+    
+    # If there are errors, show preview with errors
+    if errors:
+        return templates.TemplateResponse("upload_dataset_focused.html", {
+            "request": request,
+            "chatbot": chatbot,
+            "agent": chatbot,
+            "current_version": current_version,
+            "errors": errors,
+            "preview_rows": rows[:10] if rows else [],
+            "total_rows": len(rows),
+            "name": name,
+            "description": description
+        })
+    
+    # Create reference dataset
+    try:
+        # Save normalized data
+        file_path = DatasetProcessor.save_normalized_data(rows, f"chatbot_{chatbot_id}_v{current_version.version_number}", 1)
+        
+        # Create reference dataset
+        content_hash = ReferenceDataset.generate_content_hash(rows)
+        reference_dataset = ReferenceDataset(
+            agent_version_id=current_version.id,
+            name=name,
+            description=description,
+            row_count=len(rows),
+            content_hash=content_hash,
+            file_path=file_path
+        )
+        db.add(reference_dataset)
+        db.commit()
+        
+        return RedirectResponse(url=f"/chatbots/{chatbot_id}", status_code=302)
+    
+    except Exception as e:
+        db.rollback()
+        return templates.TemplateResponse("upload_dataset_focused.html", {
+            "request": request,
+            "chatbot": chatbot,
+            "agent": chatbot,
+            "current_version": current_version,
+            "error": f"Error saving reference dataset: {str(e)}"
+        })
+
 
 @app.post("/datasets/upload")
 async def upload_dataset(
@@ -137,10 +273,35 @@ async def upload_dataset(
         db.add(version)
         db.commit()
         
+        # Check if this was uploaded from a chatbot context
+        referer = request.headers.get('referer', '')
+        if '/chatbots/' in referer and '/datasets/upload' in referer:
+            # Extract agent_id from referer
+            import re
+            match = re.search(r'/chatbots/(\d+)/', referer)
+            if match:
+                agent_id = match.group(1)
+                return RedirectResponse(url=f"/chatbots/{agent_id}", status_code=302)
+        
         return RedirectResponse(url="/datasets", status_code=302)
     
     except Exception as e:
         db.rollback()
+        # Check if this was from a chatbot context
+        referer = request.headers.get('referer', '')
+        if '/chatbots/' in referer and '/datasets/upload' in referer:
+            import re
+            match = re.search(r'/chatbots/(\d+)/', referer)
+            if match:
+                agent_id = match.group(1)
+                agent = db.query(Agent).filter(Agent.id == agent_id).first()
+                if agent:
+                    return templates.TemplateResponse("upload_dataset_focused.html", {
+                        "request": request,
+                        "agent": agent,
+                        "error": f"Error saving dataset: {str(e)}"
+                    })
+        
         return templates.TemplateResponse("upload_dataset.html", {
             "request": request,
             "error": f"Error saving dataset: {str(e)}"
@@ -175,13 +336,18 @@ async def preview_dataset(dataset_id: int, version_id: int, db: Session = Depend
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading dataset: {str(e)}")
 
-@app.get("/agents/new", response_class=HTMLResponse)
-async def new_agent_form(request: Request):
-    """New agent form"""
+@app.get("/chatbots/new", response_class=HTMLResponse)
+async def new_chatbot_form(request: Request):
+    """New chatbot form"""
     return templates.TemplateResponse("new_agent.html", {"request": request})
 
-@app.post("/agents")
-async def create_agent(
+@app.get("/agents/new", response_class=HTMLResponse)
+async def new_agent_form_legacy(request: Request):
+    """Legacy redirect to chatbots/new"""
+    return RedirectResponse(url="/chatbots/new", status_code=302)
+
+@app.post("/chatbots")
+async def create_chatbot(
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
@@ -274,7 +440,7 @@ async def create_agent(
         db.add(version)
         db.commit()
         
-        return RedirectResponse(url="/agents", status_code=302)
+        return RedirectResponse(url="/chatbots", status_code=302)
     
     except Exception as e:
         db.rollback()
@@ -283,17 +449,88 @@ async def create_agent(
             "error": f"Error creating agent: {str(e)}"
         })
 
+@app.post("/agents")
+async def create_agent_legacy(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    tags: str = Form(""),
+    model_provider: str = Form(...),
+    model_name: str = Form(...),
+    temperature: float = Form(0.7),
+    max_tokens: int = Form(1000),
+    llm_as_judge_enabled: bool = Form(True),
+    faithfulness_enabled: bool = Form(True),
+    judge_model_provider: str = Form("openai"),
+    judge_model_name: str = Form("gpt-4"),
+    judge_temperature: float = Form(0.0),
+    endpoint_url: str = Form(""),
+    api_key: str = Form(""),
+    judge_endpoint_url: str = Form(""),
+    judge_api_key: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """Legacy create agent - redirect to chatbots"""
+    # Forward all form data to the chatbots endpoint
+    form_data = {
+        "name": name,
+        "description": description,
+        "tags": tags,
+        "model_provider": model_provider,
+        "model_name": model_name,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "llm_as_judge_enabled": llm_as_judge_enabled,
+        "faithfulness_enabled": faithfulness_enabled,
+        "judge_model_provider": judge_model_provider,
+        "judge_model_name": judge_model_name,
+        "judge_temperature": judge_temperature,
+        "endpoint_url": endpoint_url,
+        "api_key": api_key,
+        "judge_endpoint_url": judge_endpoint_url,
+        "judge_api_key": judge_api_key
+    }
+    # Create form request to forward to chatbots endpoint
+    from fastapi import Request as FastAPIRequest
+    from starlette.datastructures import FormData
+    new_form = FormData([(k, v) for k, v in form_data.items()])
+    
+    # Call the chatbots endpoint directly
+    return await create_chatbot(request, name, description, tags, model_provider, model_name, temperature, max_tokens, llm_as_judge_enabled, faithfulness_enabled, judge_model_provider, judge_model_name, judge_temperature, endpoint_url, api_key, judge_endpoint_url, judge_api_key, db)
+
+@app.get("/chatbots/{chatbot_id}", response_class=HTMLResponse)
+async def chatbot_dashboard(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
+    """Chatbot dashboard - MLflow-style chatbot view"""
+    chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Chatbot not found")
+    
+    # Get current version (latest) and its reference datasets
+    current_version = chatbot.versions[0] if chatbot.versions else None
+    reference_datasets = []
+    if current_version:
+        reference_datasets = current_version.reference_datasets
+    
+    # Get runs for this chatbot
+    runs = db.query(Run).join(AgentVersion).filter(AgentVersion.agent_id == chatbot_id).order_by(Run.created_at.desc()).all()
+    
+    return templates.TemplateResponse("experiment_dashboard.html", {
+        "request": request,
+        "experiment": chatbot,  # Template still uses experiment variable
+        "current_version": current_version,
+        "reference_datasets": reference_datasets,
+        "runs": runs
+    })
+
+@app.get("/experiments/{experiment_id}", response_class=HTMLResponse)
+async def experiment_redirect(request: Request, experiment_id: int, db: Session = Depends(get_db)):
+    """Legacy redirect to chatbot dashboard"""
+    return RedirectResponse(url=f"/chatbots/{experiment_id}", status_code=302)
+
 @app.get("/agents/{agent_id}", response_class=HTMLResponse)
 async def agent_detail(request: Request, agent_id: int, db: Session = Depends(get_db)):
-    """Agent detail page"""
-    agent = db.query(Agent).filter(Agent.id == agent_id).first()
-    if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
-    
-    return templates.TemplateResponse("agent_detail.html", {
-        "request": request,
-        "agent": agent
-    })
+    """Legacy agent detail - redirect to chatbot detail"""
+    return RedirectResponse(url=f"/chatbots/{agent_id}", status_code=302)
 
 @app.post("/api/test-connector")
 async def test_connector(
@@ -351,6 +588,26 @@ async def runs(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("runs.html", {
         "request": request,
         "runs": runs
+    })
+
+@app.get("/chatbots/{agent_id}/datasets/{reference_dataset_id}/run", response_class=HTMLResponse)
+async def new_run_for_chatbot_dataset(request: Request, agent_id: int, reference_dataset_id: int, db: Session = Depends(get_db)):
+    """New run form for specific chatbot and reference dataset"""
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    reference_dataset = db.query(ReferenceDataset).filter(ReferenceDataset.id == reference_dataset_id).first()
+    
+    if not agent or not reference_dataset:
+        raise HTTPException(status_code=404, detail="Chatbot or reference dataset not found")
+    
+    # Verify the reference dataset belongs to this chatbot
+    if reference_dataset.agent_version.agent_id != agent_id:
+        raise HTTPException(status_code=404, detail="Reference dataset does not belong to this chatbot")
+    
+    return templates.TemplateResponse("new_run_focused.html", {
+        "request": request,
+        "agent": agent,
+        "reference_dataset": reference_dataset,
+        "agent_version": reference_dataset.agent_version
     })
 
 @app.get("/runs/new", response_class=HTMLResponse)
