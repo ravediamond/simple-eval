@@ -156,8 +156,12 @@ class AgentVersion(Base):
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # Model configuration for the tested model
-    model_config = Column(JSON, nullable=False)  # {provider, model, temperature, max_tokens, etc}
+    # LLM Configuration references
+    llm_config_id = Column(Integer, ForeignKey("llm_configurations.id"), nullable=True)  # For chatbot inference
+    judge_config_id = Column(Integer, ForeignKey("llm_configurations.id"), nullable=True)  # For evaluation judge
+    
+    # Legacy model configuration (kept for backward compatibility)
+    model_config = Column(JSON, nullable=True)  # {provider, model, temperature, max_tokens, etc}
     
     # Metric toggles
     llm_as_judge_enabled = Column(Boolean, default=True)
@@ -166,13 +170,13 @@ class AgentVersion(Base):
     # Default thresholds
     default_thresholds = Column(JSON)  # {metric_name: threshold_value}
     
-    # Judge model configuration
+    # Legacy judge model configuration (kept for backward compatibility)
     judge_model_config = Column(JSON)  # {provider, model, temperature, etc}
     
-    # Editable judge prompt
+    # Editable judge prompt (overrides LLM config default if provided)
     judge_prompt = Column(Text)
     
-    # Connector configuration for live evaluation
+    # Connector configuration for live evaluation (deprecated - use llm_config instead)
     connector_enabled = Column(Boolean, default=False)
     connector_config = Column(JSON)  # ConnectorConfig as JSON
     
@@ -181,6 +185,8 @@ class AgentVersion(Base):
     
     # Relationships
     agent = relationship("Agent", back_populates="versions")
+    llm_config = relationship("LLMConfiguration", foreign_keys=[llm_config_id])
+    judge_config = relationship("LLMConfiguration", foreign_keys=[judge_config_id])
     reference_datasets = relationship("ReferenceDataset", back_populates="agent_version", cascade="all, delete-orphan")
     runs = relationship("Run", foreign_keys="Run.agent_version_id", back_populates="agent_version")
     

@@ -80,6 +80,77 @@
     </div>
 </div>
 
+<!-- Configuration Section -->
+{% if current_version %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">LLM Configuration</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Chatbot LLM</h6>
+                        {% if current_version.llm_config %}
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-info me-2">{{ current_version.llm_config.display_provider }}</span>
+                            <code>{{ current_version.llm_config.model_name }}</code>
+                        </div>
+                        <p class="text-muted small mb-0">{{ current_version.llm_config.name }}</p>
+                        {% elif current_version.model_config %}
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-secondary me-2">{{ current_version.model_config.provider }}</span>
+                            <code>{{ current_version.model_config.model }}</code>
+                        </div>
+                        <p class="text-muted small mb-0">Legacy configuration</p>
+                        {% else %}
+                        <p class="text-muted">No configuration</p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Judge LLM</h6>
+                        {% if current_version.judge_config %}
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-warning me-2">{{ current_version.judge_config.display_provider }}</span>
+                            <code>{{ current_version.judge_config.model_name }}</code>
+                        </div>
+                        <p class="text-muted small mb-0">{{ current_version.judge_config.name }}</p>
+                        {% elif current_version.judge_model_config %}
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-secondary me-2">{{ current_version.judge_model_config.provider }}</span>
+                            <code>{{ current_version.judge_model_config.model }}</code>
+                        </div>
+                        <p class="text-muted small mb-0">Legacy configuration</p>
+                        {% else %}
+                        <p class="text-muted">Same as chatbot LLM</p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <h6>Evaluation Settings</h6>
+                        <div class="d-flex gap-3">
+                            <div>
+                                <span class="badge bg-{% if current_version.llm_as_judge_enabled %}success{% else %}secondary{% endif %}">
+                                    LLM-as-Judge: {% if current_version.llm_as_judge_enabled %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </div>
+                            <div>
+                                <span class="badge bg-{% if current_version.faithfulness_enabled %}success{% else %}secondary{% endif %}">
+                                    Faithfulness: {% if current_version.faithfulness_enabled %}Enabled{% else %}Disabled{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Datasets Section -->
 <div class="row mt-4">
     <div class="col-12">

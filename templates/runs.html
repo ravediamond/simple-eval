@@ -46,8 +46,14 @@
                                         <small class="text-muted">({{ run.agent_version.display_name }})</small>
                                     </td>
                                     <td>
-                                        {{ run.dataset_version.dataset.name }}
-                                        <small class="text-muted">({{ run.dataset_version.display_name }})</small>
+                                        {% if run.reference_dataset %}
+                                            {{ run.reference_dataset.name }}
+                                        {% elif run.dataset_version %}
+                                            {{ run.dataset_version.dataset.name }}
+                                            <small class="text-muted">({{ run.dataset_version.display_name }})</small>
+                                        {% else %}
+                                            <span class="text-muted">No dataset</span>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if run.status == 'completed' %}

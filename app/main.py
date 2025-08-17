@@ -348,9 +348,13 @@ async def preview_dataset(dataset_id: int, version_id: int, db: Session = Depend
         raise HTTPException(status_code=500, detail=f"Error reading dataset: {str(e)}")
 
 @app.get("/chatbots/new", response_class=HTMLResponse)
-async def new_chatbot_form(request: Request):
+async def new_chatbot_form(request: Request, db: Session = Depends(get_db)):
     """New chatbot form"""
-    return templates.TemplateResponse("new_agent.html", {"request": request})
+    llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+    return templates.TemplateResponse("new_agent.html", {
+        "request": request,
+        "llm_configs": llm_configs
+    })
 
 @app.get("/agents/new", response_class=HTMLResponse)
 async def new_agent_form_legacy(request: Request):
@@ -362,14 +366,12 @@ async def create_chatbot(
     request: Request,
     name: str = Form(...),
     description: str = Form(""),
-    model_provider: str = Form(...),
-    model_name: str = Form(...),
-    temperature: float = Form(0.0),
-    max_tokens: int = Form(1000),
+    llm_config_id: int = Form(...),
+    judge_config_id: str = Form(""),
     llm_as_judge_enabled: bool = Form(True),
     faithfulness_enabled: bool = Form(True),
     judge_prompt: str = Form(""),
-    # Connector fields
+    # Legacy connector fields (deprecated but kept for backward compatibility)
     connector_enabled: bool = Form(False),
     connector_type: str = Form("openai"),
     connector_endpoint: str = Form(""),
@@ -383,33 +385,64 @@ async def create_chatbot(
 ):
     """Create a new chatbot"""
     try:
-        # Create agent (no tags)
+        # Validate LLM configuration exists
+        llm_config = db.query(LLMConfiguration).filter(LLMConfiguration.id == llm_config_id).first()
+        if not llm_config:
+            llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+            return templates.TemplateResponse("new_agent.html", {
+                "request": request,
+                "llm_configs": llm_configs,
+                "error": "Selected LLM configuration not found"
+            })
+        
+        # Validate judge configuration if provided
+        judge_config = None
+        if judge_config_id and judge_config_id.strip():
+            try:
+                judge_config_id_int = int(judge_config_id)
+                judge_config = db.query(LLMConfiguration).filter(LLMConfiguration.id == judge_config_id_int).first()
+                if not judge_config:
+                    llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+                    return templates.TemplateResponse("new_agent.html", {
+                        "request": request,
+                        "llm_configs": llm_configs,
+                        "error": "Selected judge configuration not found"
+                    })
+            except ValueError:
+                llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+                return templates.TemplateResponse("new_agent.html", {
+                    "request": request,
+                    "llm_configs": llm_configs,
+                    "error": "Invalid judge configuration ID"
+                })
+        else:
+            # Use default judge if no specific judge config selected
+            judge_config = db.query(LLMConfiguration).filter(
+                LLMConfiguration.is_default_judge == True,
+                LLMConfiguration.is_active == True
+            ).first()
+        
+        # Create agent
         agent = Agent(
             name=name,
             description=description,
-            tags=[]  # Remove tags support
+            tags=[]
         )
         db.add(agent)
         db.flush()  # Get the ID
         
-        # Create unified model configuration (used for both chatbot and judge)
-        model_config = {
-            "provider": model_provider,
-            "model": model_name,
-            "temperature": temperature,
-            "max_tokens": max_tokens
-        }
-        
-        # Use same model config for judge (no separate judge config needed)
-        judge_model_config = model_config.copy()
-        
+        # Set up default thresholds - use judge config thresholds if available
         default_thresholds = {
-            "llm_as_judge": 0.8,
-            "faithfulness": 0.8
+            "llm_as_judge": judge_config.llm_as_judge_threshold if judge_config else 0.8,
+            "faithfulness": judge_config.faithfulness_threshold if judge_config else 0.8
         }
         
-        # Default judge prompt
-        default_judge_prompt = judge_prompt or """You are an expert evaluator assessing the quality and correctness of AI responses.
+        # Use judge prompt from form, or from judge config, or default
+        effective_judge_prompt = judge_prompt
+        if not effective_judge_prompt and judge_config and judge_config.default_judge_prompt:
+            effective_judge_prompt = judge_config.default_judge_prompt
+        if not effective_judge_prompt:
+            effective_judge_prompt = """You are an expert evaluator assessing the quality and correctness of AI responses.
 
 Please evaluate the given response to the question on the following criteria:
 1. Accuracy: Is the response factually correct?
@@ -419,7 +452,7 @@ Please evaluate the given response to the question on the following criteria:
 
 Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning."""
         
-        # Configure connector if enabled
+        # Legacy connector configuration (deprecated)
         connector_config_dict = None
         if connector_enabled and connector_endpoint:
             connector_config_dict = {
@@ -427,8 +460,8 @@ Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain you
                 "endpoint_url": connector_endpoint,
                 "api_key": connector_api_key if connector_api_key else None,
                 "model_name": connector_model if connector_model else None,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
+                "temperature": 0.7,
+                "max_tokens": 1000,
                 "timeout_seconds": connector_timeout,
                 "rate_limit_per_minute": connector_rate_limit
             }
@@ -437,12 +470,14 @@ Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain you
             agent_id=agent.id,
             version_number=1,
             notes="Initial version",
-            model_config=model_config,
+            llm_config_id=llm_config.id,
+            judge_config_id=judge_config.id if judge_config else None,
+            model_config={},  # Empty dict for new chatbots using LLM configurations
+            judge_model_config={},  # Empty dict for new chatbots using LLM configurations
             llm_as_judge_enabled=llm_as_judge_enabled,
             faithfulness_enabled=faithfulness_enabled,
             default_thresholds=default_thresholds,
-            judge_model_config=judge_model_config,
-            judge_prompt=default_judge_prompt,
+            judge_prompt=effective_judge_prompt,
             connector_enabled=connector_enabled,
             connector_config=connector_config_dict,
             store_verbose_artifacts=store_verbose_artifacts
@@ -454,9 +489,11 @@ Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain you
     
     except Exception as e:
         db.rollback()
+        llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
         return templates.TemplateResponse("new_agent.html", {
             "request": request,
-            "error": f"Error creating agent: {str(e)}"
+            "llm_configs": llm_configs,
+            "error": f"Error creating chatbot: {str(e)}"
         })
 
 @app.post("/agents")

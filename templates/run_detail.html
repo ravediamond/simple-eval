@@ -73,18 +73,27 @@
                         </td>
                     </tr>
                     <tr>
-                        <td><strong>Dataset Version:</strong></td>
+                        <td><strong>Dataset:</strong></td>
                         <td>
-                            {{ run.dataset_version.dataset.name }}
-                            <span class="badge bg-success ms-2">{{ run.dataset_version.display_name }}</span>
-                            {% if run.dataset_version.notes %}
-                                <br><small class="text-muted">{{ run.dataset_version.notes }}</small>
+                            {% if run.reference_dataset %}
+                                {{ run.reference_dataset.name }}
+                                <br><small class="text-muted">{{ run.reference_dataset.description }}</small>
+                                <br><small class="text-muted">
+                                    Created: {{ run.reference_dataset.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                    • {{ run.reference_dataset.row_count }} rows
+                                </small>
+                            {% elif run.dataset_version %}
+                                {{ run.dataset_version.dataset.name }}
+                                <span class="badge bg-success ms-2">{{ run.dataset_version.display_name }}</span>
+                                {% if run.dataset_version.notes %}
+                                    <br><small class="text-muted">{{ run.dataset_version.notes }}</small>
+                                {% endif %}
+                                <br><small class="text-muted">
+                                    Created: {{ run.dataset_version.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                </small>
+                            {% else %}
+                                <span class="text-muted">No dataset</span>
                             {% endif %}
-                            <br><small class="text-muted">
-                                Created: {{ run.dataset_version.created_at.strftime('%Y-%m-%d %H:%M') }}
-                                | Rows: {{ run.dataset_version.row_count }}
-                                | Hash: {{ run.dataset_version.content_hash[:8] }}...
-                            </small>
                         </td>
                     </tr>
                     <tr>
