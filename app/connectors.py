@@ -2,10 +2,17 @@ import asyncio
 import aiohttp
 import json
 import time
+import os
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+
+try:
+    from litellm import acompletion
+    LITELLM_AVAILABLE = True
+except ImportError:
+    LITELLM_AVAILABLE = False
 
 @dataclass
 class ConnectorResponse:
@@ -307,12 +314,149 @@ class HTTPConnector(BaseConnector):
         except Exception:
             return False
 
+class LiteLLMConnector(BaseConnector):
+    """Connector for LiteLLM-supported providers (OpenAI, Anthropic, Google, AWS, Ollama, etc.)"""
+    
+    def __init__(self, config: ConnectorConfig):
+        if not LITELLM_AVAILABLE:
+            raise ImportError("LiteLLM is not installed. Run: pip install litellm")
+        super().__init__(config)
+        self._setup_environment()
+    
+    def _setup_environment(self):
+        """Setup environment variables for LiteLLM authentication"""
+        if self.config.api_key:
+            # Map connector types to appropriate environment variables
+            env_mapping = {
+                "litellm_openai": "OPENAI_API_KEY",
+                "litellm_anthropic": "ANTHROPIC_API_KEY", 
+                "litellm_google": "GOOGLE_APPLICATION_CREDENTIALS",
+                "litellm_aws": "AWS_ACCESS_KEY_ID",
+                "litellm_azure": "AZURE_API_KEY",
+                "litellm_cohere": "COHERE_API_KEY",
+                "litellm_replicate": "REPLICATE_API_TOKEN",
+                "litellm_huggingface": "HUGGINGFACE_API_KEY"
+            }
+            
+            env_var = env_mapping.get(self.config.connector_type)
+            if env_var and not os.getenv(env_var):
+                os.environ[env_var] = self.config.api_key
+    
+    async def evaluate(self, question: str, context: Optional[str] = None) -> ConnectorResponse:
+        """Evaluate using LiteLLM-supported provider"""
+        self._check_rate_limit()
+        
+        start_time = time.time()
+        
+        try:
+            return await self._retry_with_backoff(self._make_request, question, context)
+        except Exception as e:
+            return ConnectorResponse(
+                answer="",
+                success=False,
+                error_message=str(e),
+                response_time_ms=int((time.time() - start_time) * 1000)
+            )
+    
+    async def _make_request(self, question: str, context: Optional[str] = None) -> ConnectorResponse:
+        """Make the actual LiteLLM API request"""
+        start_time = time.time()
+        
+        # Prepare the prompt
+        if context:
+            prompt = f"Context: {context}\n\nQuestion: {question}\n\nAnswer:"
+        else:
+            prompt = f"Question: {question}\n\nAnswer:"
+        
+        # Prepare request parameters for LiteLLM
+        params = {
+            "model": self.config.model_name or self._get_default_model(),
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": self.config.temperature,
+            "max_tokens": self.config.max_tokens,
+        }
+        
+        # Add any additional parameters
+        if self.config.additional_params:
+            params.update(self.config.additional_params)
+        
+        # Handle custom endpoint for local models (like Ollama)
+        if self.config.endpoint_url and self.config.connector_type == "litellm_ollama":
+            params["api_base"] = self.config.endpoint_url
+        
+        try:
+            # Make async call to LiteLLM
+            response = await acompletion(**params)
+            response_time_ms = int((time.time() - start_time) * 1000)
+            
+            # Extract answer from response
+            answer = response.choices[0].message.content.strip()
+            tokens_used = getattr(response.usage, 'total_tokens', None) if hasattr(response, 'usage') else None
+            
+            return ConnectorResponse(
+                answer=answer,
+                success=True,
+                response_time_ms=response_time_ms,
+                tokens_used=tokens_used,
+                metadata={
+                    "model": response.model if hasattr(response, 'model') else params["model"],
+                    "provider": self._extract_provider_from_model(params["model"])
+                }
+            )
+            
+        except Exception as e:
+            response_time_ms = int((time.time() - start_time) * 1000)
+            return ConnectorResponse(
+                answer="",
+                success=False,
+                error_message=f"LiteLLM request failed: {str(e)}",
+                response_time_ms=response_time_ms
+            )
+    
+    def _get_default_model(self) -> str:
+        """Get default model based on connector type"""
+        defaults = {
+            "litellm_openai": "gpt-3.5-turbo",
+            "litellm_anthropic": "claude-3-haiku-20240307",
+            "litellm_google": "gemini-pro", 
+            "litellm_aws": "anthropic.claude-3-haiku-20240307-v1:0",
+            "litellm_azure": "azure/gpt-35-turbo",
+            "litellm_ollama": "ollama/llama2",
+            "litellm_cohere": "cohere/command-r",
+            "litellm_replicate": "replicate/meta/llama-2-70b-chat:latest",
+            "litellm_huggingface": "huggingface/microsoft/DialoGPT-medium"
+        }
+        return defaults.get(self.config.connector_type, "gpt-3.5-turbo")
+    
+    def _extract_provider_from_model(self, model: str) -> str:
+        """Extract provider name from model string"""
+        if "/" in model:
+            return model.split("/")[0]
+        return self.config.connector_type.replace("litellm_", "")
+    
+    async def test_connection(self) -> bool:
+        """Test the LiteLLM connection with a simple request"""
+        try:
+            response = await self.evaluate("What is 2+2?")
+            return response.success
+        except Exception:
+            return False
+
 class ConnectorFactory:
     """Factory for creating connectors"""
     
     _connectors = {
         "openai": OpenAIConnector,
         "http": HTTPConnector,
+        "litellm_openai": LiteLLMConnector,
+        "litellm_anthropic": LiteLLMConnector,
+        "litellm_google": LiteLLMConnector,
+        "litellm_aws": LiteLLMConnector,
+        "litellm_azure": LiteLLMConnector,
+        "litellm_ollama": LiteLLMConnector,
+        "litellm_cohere": LiteLLMConnector,
+        "litellm_replicate": LiteLLMConnector,
+        "litellm_huggingface": LiteLLMConnector,
     }
     
     @classmethod

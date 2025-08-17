@@ -13,7 +13,57 @@ from deepeval.models import OpenAIGPT
 from deepeval.metrics import GEval, FaithfulnessMetric as DeepEvalFaithfulness
 from deepeval.test_case import LLMTestCase
 
-from app.connectors import ConnectorConfig
+try:
+    from deepeval.models.base_model import DeepEvalBaseLLM
+    DEEPEVAL_BASE_AVAILABLE = True
+except ImportError:
+    DEEPEVAL_BASE_AVAILABLE = False
+
+from app.connectors import ConnectorConfig, ConnectorFactory, LiteLLMConnector
+
+class LiteLLMDeepEvalModel(DeepEvalBaseLLM if DEEPEVAL_BASE_AVAILABLE else object):
+    """Custom DeepEval model wrapper for LiteLLM connectors"""
+    
+    def __init__(self, connector_config: ConnectorConfig):
+        self.connector_config = connector_config
+        self.connector = ConnectorFactory.create_connector(connector_config)
+    
+    def load_model(self):
+        """Load model - not needed for LiteLLM"""
+        pass
+    
+    def generate(self, prompt: str) -> str:
+        """Generate response using LiteLLM connector"""
+        import asyncio
+        
+        async def _async_generate():
+            async with self.connector:
+                response = await self.connector.evaluate(prompt)
+                if response.success:
+                    return response.answer
+                else:
+                    raise Exception(f"LiteLLM generation failed: {response.error_message}")
+        
+        # Run async function in event loop
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(_async_generate())
+        except RuntimeError:
+            # If no event loop, create one
+            return asyncio.run(_async_generate())
+    
+    async def a_generate(self, prompt: str) -> str:
+        """Async generate response using LiteLLM connector"""
+        async with self.connector:
+            response = await self.connector.evaluate(prompt)
+            if response.success:
+                return response.answer
+            else:
+                raise Exception(f"LiteLLM generation failed: {response.error_message}")
+    
+    def get_model_name(self) -> str:
+        """Get model name"""
+        return self.connector_config.model_name or "litellm-model"
 
 @dataclass
 class EvaluationResult:
@@ -43,9 +93,11 @@ class DeepEvalEngine:
                     api_key=self.judge_config.api_key,
                     temperature=self.judge_config.temperature
                 )
+            elif self.judge_config.connector_type.startswith("litellm_") and DEEPEVAL_BASE_AVAILABLE:
+                # Use LiteLLM connector for DeepEval
+                self._model = LiteLLMDeepEvalModel(self.judge_config)
             else:
-                # For non-OpenAI connectors, we'll use OpenAI as the judge model
-                # but get API key from environment or config
+                # Fallback to OpenAI for compatibility
                 import os
                 api_key = os.getenv("OPENAI_API_KEY") or self.judge_config.api_key
                 self._model = OpenAIGPT(
