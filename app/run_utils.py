@@ -7,7 +7,7 @@ import asyncio
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from app.models import Run, TestCase, MetricResult, AgentVersion, DatasetVersion
+from app.models import Run, TestCase, MetricResult, AgentVersion, DatasetVersion, LLMConfiguration
 from app.connectors import ConnectorFactory, ConnectorConfig, ConnectorManager
 from app.evaluation_engine import EvaluationEngine
 
@@ -296,13 +296,27 @@ class RunProcessor:
     async def _process_test_case(self, test_case: TestCase, agent_version: AgentVersion) -> None:
         """Process a single test case with enabled metrics using real evaluation engine"""
         
-        # Create judge connector config from agent version
-        judge_config = ConnectorConfig(**agent_version.judge_model_config)
-        evaluation_engine = EvaluationEngine(judge_config)
+        # Try to get default judge configuration from database first
+        default_judge_config = self.db.query(LLMConfiguration).filter(
+            LLMConfiguration.is_default_judge == True,
+            LLMConfiguration.is_active == True
+        ).first()
         
-        # Get thresholds
-        llm_as_judge_threshold = agent_version.default_thresholds.get('llm_as_judge', 0.8)
-        faithfulness_threshold = agent_version.default_thresholds.get('faithfulness', 0.8)
+        if default_judge_config:
+            # Use saved LLM configuration as judge
+            judge_config = default_judge_config.to_connector_config()
+            # Override judge prompt if agent has custom prompt
+            custom_prompt = agent_version.judge_prompt or default_judge_config.default_judge_prompt
+            llm_as_judge_threshold = default_judge_config.llm_as_judge_threshold
+            faithfulness_threshold = default_judge_config.faithfulness_threshold
+        else:
+            # Fallback to agent version judge config
+            judge_config = ConnectorConfig(**agent_version.judge_model_config)
+            custom_prompt = agent_version.judge_prompt
+            llm_as_judge_threshold = agent_version.default_thresholds.get('llm_as_judge', 0.8)
+            faithfulness_threshold = agent_version.default_thresholds.get('faithfulness', 0.8)
+        
+        evaluation_engine = EvaluationEngine(judge_config)
         
         try:
             # Evaluate test case with real metrics
@@ -315,7 +329,7 @@ class RunProcessor:
                 faithfulness_enabled=agent_version.faithfulness_enabled,
                 llm_as_judge_threshold=llm_as_judge_threshold,
                 faithfulness_threshold=faithfulness_threshold,
-                custom_judge_prompt=agent_version.judge_prompt,
+                custom_judge_prompt=custom_prompt,
                 store_verbose_artifacts=agent_version.store_verbose_artifacts or False
             )
             

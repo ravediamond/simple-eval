@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 from app.database import init_db, get_db
-from app.models import Dataset, DatasetVersion, Agent, AgentVersion, Run, TestCase, MetricResult, ReferenceDataset
+from app.models import Dataset, DatasetVersion, Agent, AgentVersion, Run, TestCase, MetricResult, ReferenceDataset, LLMConfiguration
 from app.dataset_utils import DatasetProcessor
 from app.run_utils import AnswersProcessor, RunProcessor
 from app.export_utils import RunExporter, ResultsFilter
@@ -91,6 +91,17 @@ async def datasets(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("datasets.html", {
         "request": request, 
         "datasets": datasets
+    })
+
+@app.get("/configs", response_class=HTMLResponse)
+async def configs_page(request: Request, db: Session = Depends(get_db)):
+    """LLM Configurations page"""
+    configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).order_by(LLMConfiguration.created_at.desc()).all()
+    available_types = ConnectorFactory.get_available_types()
+    return templates.TemplateResponse("configs.html", {
+        "request": request,
+        "configs": configs,
+        "available_types": available_types
     })
 
 @app.get("/chatbots/{chatbot_id}/datasets/upload", response_class=HTMLResponse)
@@ -1057,3 +1068,287 @@ def _recalculate_run_aggregates(run: Run, db: Session):
         }
     
     run.aggregate_results = aggregate_results
+
+# LLM Configuration Management APIs
+
+@app.post("/api/configs")
+async def create_llm_config(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    connector_type: str = Form(...),
+    endpoint_url: str = Form(...),
+    api_key: str = Form(""),
+    model_name: str = Form(...),
+    temperature: float = Form(0.7),
+    max_tokens: int = Form(1000),
+    timeout_seconds: int = Form(30),
+    rate_limit_per_minute: int = Form(60),
+    is_default_judge: bool = Form(False),
+    default_judge_prompt: str = Form(""),
+    llm_as_judge_threshold: float = Form(0.8),
+    faithfulness_threshold: float = Form(0.8),
+    additional_params: str = Form("{}"),
+    db: Session = Depends(get_db)
+):
+    """Create new LLM configuration"""
+    try:
+        # Parse additional parameters
+        import json
+        try:
+            additional_params_dict = json.loads(additional_params) if additional_params.strip() else {}
+        except json.JSONDecodeError:
+            return JSONResponse({
+                "success": False,
+                "message": "Invalid JSON in additional parameters"
+            }, status_code=400)
+        
+        # Check if name already exists
+        existing = db.query(LLMConfiguration).filter(LLMConfiguration.name == name).first()
+        if existing:
+            return JSONResponse({
+                "success": False,
+                "message": "Configuration name already exists"
+            }, status_code=400)
+        
+        # If this is set as default judge, unset others
+        if is_default_judge:
+            db.query(LLMConfiguration).update({LLMConfiguration.is_default_judge: False})
+        
+        # Create configuration
+        config = LLMConfiguration(
+            name=name,
+            description=description,
+            connector_type=connector_type,
+            endpoint_url=endpoint_url,
+            api_key=api_key if api_key else None,
+            model_name=model_name,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout_seconds=timeout_seconds,
+            rate_limit_per_minute=rate_limit_per_minute,
+            additional_params=additional_params_dict,
+            is_default_judge=is_default_judge,
+            default_judge_prompt=default_judge_prompt if default_judge_prompt else None,
+            llm_as_judge_threshold=llm_as_judge_threshold,
+            faithfulness_threshold=faithfulness_threshold
+        )
+        
+        db.add(config)
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Configuration created successfully",
+            "config_id": config.id
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "message": f"Error creating configuration: {str(e)}"
+        }, status_code=500)
+
+@app.post("/api/configs/{config_id}/test")
+async def test_llm_config(config_id: int, db: Session = Depends(get_db)):
+    """Test an LLM configuration"""
+    config = db.query(LLMConfiguration).filter(LLMConfiguration.id == config_id).first()
+    if not config:
+        return JSONResponse({
+            "success": False,
+            "message": "Configuration not found"
+        }, status_code=404)
+    
+    try:
+        connector_config = config.to_connector_config()
+        connector = ConnectorFactory.create_connector(connector_config)
+        
+        async with connector:
+            response = await connector.evaluate("What is 2+2? Answer briefly.")
+            
+            if response.success:
+                return JSONResponse({
+                    "success": True,
+                    "message": "Configuration test successful!",
+                    "test_answer": response.answer,
+                    "response_time_ms": response.response_time_ms,
+                    "provider": response.metadata.get('provider') if response.metadata else config.display_provider
+                })
+            else:
+                return JSONResponse({
+                    "success": False,
+                    "message": f"Test failed: {response.error_message}"
+                })
+    
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "message": f"Test failed: {str(e)}"
+        })
+
+@app.put("/api/configs/{config_id}")
+async def update_llm_config(
+    config_id: int,
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    connector_type: str = Form(...),
+    endpoint_url: str = Form(...),
+    api_key: str = Form(""),
+    model_name: str = Form(...),
+    temperature: float = Form(0.7),
+    max_tokens: int = Form(1000),
+    timeout_seconds: int = Form(30),
+    rate_limit_per_minute: int = Form(60),
+    is_default_judge: bool = Form(False),
+    default_judge_prompt: str = Form(""),
+    llm_as_judge_threshold: float = Form(0.8),
+    faithfulness_threshold: float = Form(0.8),
+    additional_params: str = Form("{}"),
+    db: Session = Depends(get_db)
+):
+    """Update LLM configuration"""
+    config = db.query(LLMConfiguration).filter(LLMConfiguration.id == config_id).first()
+    if not config:
+        return JSONResponse({
+            "success": False,
+            "message": "Configuration not found"
+        }, status_code=404)
+    
+    try:
+        # Parse additional parameters
+        import json
+        try:
+            additional_params_dict = json.loads(additional_params) if additional_params.strip() else {}
+        except json.JSONDecodeError:
+            return JSONResponse({
+                "success": False,
+                "message": "Invalid JSON in additional parameters"
+            }, status_code=400)
+        
+        # Check if name already exists (excluding current config)
+        existing = db.query(LLMConfiguration).filter(
+            LLMConfiguration.name == name,
+            LLMConfiguration.id != config_id
+        ).first()
+        if existing:
+            return JSONResponse({
+                "success": False,
+                "message": "Configuration name already exists"
+            }, status_code=400)
+        
+        # If this is set as default judge, unset others
+        if is_default_judge and not config.is_default_judge:
+            db.query(LLMConfiguration).update({LLMConfiguration.is_default_judge: False})
+        
+        # Update configuration
+        config.name = name
+        config.description = description
+        config.connector_type = connector_type
+        config.endpoint_url = endpoint_url
+        config.api_key = api_key if api_key else None
+        config.model_name = model_name
+        config.temperature = temperature
+        config.max_tokens = max_tokens
+        config.timeout_seconds = timeout_seconds
+        config.rate_limit_per_minute = rate_limit_per_minute
+        config.additional_params = additional_params_dict
+        config.is_default_judge = is_default_judge
+        config.default_judge_prompt = default_judge_prompt if default_judge_prompt else None
+        config.llm_as_judge_threshold = llm_as_judge_threshold
+        config.faithfulness_threshold = faithfulness_threshold
+        config.updated_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Configuration updated successfully"
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "message": f"Error updating configuration: {str(e)}"
+        }, status_code=500)
+
+@app.delete("/api/configs/{config_id}")
+async def delete_llm_config(config_id: int, db: Session = Depends(get_db)):
+    """Delete LLM configuration (soft delete)"""
+    config = db.query(LLMConfiguration).filter(LLMConfiguration.id == config_id).first()
+    if not config:
+        return JSONResponse({
+            "success": False,
+            "message": "Configuration not found"
+        }, status_code=404)
+    
+    try:
+        # Soft delete
+        config.is_active = False
+        config.updated_at = datetime.utcnow()
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Configuration deleted successfully"
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "message": f"Error deleting configuration: {str(e)}"
+        }, status_code=500)
+
+@app.get("/api/configs/{config_id}")
+async def get_llm_config(config_id: int, db: Session = Depends(get_db)):
+    """Get LLM configuration details"""
+    config = db.query(LLMConfiguration).filter(LLMConfiguration.id == config_id).first()
+    if not config:
+        return JSONResponse({
+            "success": False,
+            "message": "Configuration not found"
+        }, status_code=404)
+    
+    return JSONResponse({
+        "success": True,
+        "config": {
+            "id": config.id,
+            "name": config.name,
+            "description": config.description,
+            "connector_type": config.connector_type,
+            "endpoint_url": config.endpoint_url,
+            "api_key": config.api_key or "",
+            "model_name": config.model_name,
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens,
+            "timeout_seconds": config.timeout_seconds,
+            "rate_limit_per_minute": config.rate_limit_per_minute,
+            "additional_params": json.dumps(config.additional_params or {}, indent=2),
+            "is_default_judge": config.is_default_judge,
+            "default_judge_prompt": config.default_judge_prompt or "",
+            "llm_as_judge_threshold": config.llm_as_judge_threshold,
+            "faithfulness_threshold": config.faithfulness_threshold,
+            "display_provider": config.display_provider,
+            "created_at": config.created_at.isoformat(),
+            "updated_at": config.updated_at.isoformat()
+        }
+    })
+
+@app.get("/api/configs")
+async def get_llm_configs(db: Session = Depends(get_db)):
+    """Get all active LLM configurations"""
+    configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+    return [
+        {
+            "id": config.id,
+            "name": config.name,
+            "description": config.description,
+            "display_provider": config.display_provider,
+            "model_name": config.model_name,
+            "is_default_judge": config.is_default_judge
+        }
+        for config in configs
+    ]

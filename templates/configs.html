@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block title %}LLM Configurations - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>LLM Configurations</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#configModal">
+        <i class="bi bi-plus-circle"></i> New Configuration
+    </button>
+</div>
+
+<!-- Alert for messages -->
+<div id="alertContainer"></div>
+
+<!-- Configurations Table -->
+<div class="card">
+    <div class="card-body">
+        {% if configs %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Provider</th>
+                        <th>Model</th>
+                        <th>Status</th>
+                        <th>Default Judge</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for config in configs %}
+                    <tr>
+                        <td>
+                            <strong>{{ config.name }}</strong>
+                            {% if config.description %}
+                            <br><small class="text-muted">{{ config.description }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ config.display_provider }}</span>
+                        </td>
+                        <td>
+                            <code>{{ config.model_name }}</code>
+                        </td>
+                        <td>
+                            <span class="badge bg-success" id="status-{{ config.id }}">Active</span>
+                        </td>
+                        <td>
+                            {% if config.is_default_judge %}
+                            <span class="badge bg-warning">Default Judge</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ config.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-success" onclick="testConfig({{ config.id }})" id="test-btn-{{ config.id }}">
+                                    Test
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" onclick="editConfig({{ config.id }})">
+                                    Edit
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" onclick="deleteConfig({{ config.id }}, '{{ config.name }}')">
+                                    Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <h5 class="text-muted">No LLM configurations yet</h5>
+            <p class="text-muted">Create your first configuration to start using different LLM providers</p>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#configModal">
+                Create Configuration
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Configuration Modal -->
+<div class="modal fade" id="configModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="configModalTitle">New LLM Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="configForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Configuration Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="connector_type" class="form-label">Provider *</label>
+                                <select class="form-select" id="connector_type" name="connector_type" required onchange="updateProviderDefaults()">
+                                    <option value="">Select Provider</option>
+                                    {% for type in available_types %}
+                                    <option value="{{ type }}">{{ type.replace('litellm_', '').replace('_', ' ').title() }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="2"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="endpoint_url" class="form-label">Endpoint URL *</label>
+                                <input type="url" class="form-control" id="endpoint_url" name="endpoint_url" required>
+                                <small class="form-text text-muted" id="endpoint_help">The API endpoint for this provider</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="model_name" class="form-label">Model Name *</label>
+                                <input type="text" class="form-control" id="model_name" name="model_name" required>
+                                <small class="form-text text-muted" id="model_help">e.g., gpt-3.5-turbo, claude-3-haiku-20240307</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="api_key" class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="api_key" name="api_key">
+                        <small class="form-text text-muted">API key for authentication (leave empty if not required)</small>
+                    </div>
+
+                    <!-- Model Parameters -->
+                    <h6 class="mt-4">Model Parameters</h6>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="temperature" class="form-label">Temperature</label>
+                                <input type="number" class="form-control" id="temperature" name="temperature" min="0" max="2" step="0.1" value="0.7">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="max_tokens" class="form-label">Max Tokens</label>
+                                <input type="number" class="form-control" id="max_tokens" name="max_tokens" min="1" max="100000" value="1000">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="timeout_seconds" class="form-label">Timeout (s)</label>
+                                <input type="number" class="form-control" id="timeout_seconds" name="timeout_seconds" min="1" max="300" value="30">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="rate_limit_per_minute" class="form-label">Rate Limit</label>
+                                <input type="number" class="form-control" id="rate_limit_per_minute" name="rate_limit_per_minute" min="1" value="60">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Judge Settings -->
+                    <h6 class="mt-4">Judge Settings</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="is_default_judge" name="is_default_judge">
+                                <label class="form-check-label" for="is_default_judge">
+                                    Set as Default Judge
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="llm_as_judge_threshold" class="form-label">LLM Judge Threshold</label>
+                                <input type="number" class="form-control" id="llm_as_judge_threshold" name="llm_as_judge_threshold" min="0" max="1" step="0.01" value="0.8">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="faithfulness_threshold" class="form-label">Faithfulness Threshold</label>
+                                <input type="number" class="form-control" id="faithfulness_threshold" name="faithfulness_threshold" min="0" max="1" step="0.01" value="0.8">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="default_judge_prompt" class="form-label">Default Judge Prompt</label>
+                        <textarea class="form-control" id="default_judge_prompt" name="default_judge_prompt" rows="4" placeholder="Enter the default prompt for LLM-as-Judge evaluation...">You are an expert evaluator assessing the quality and correctness of AI responses.
+
+Please evaluate the given response to the question on the following criteria:
+1. Accuracy: Is the response factually correct?
+2. Completeness: Does it fully answer the question?
+3. Clarity: Is it well-written and understandable?
+4. Relevance: Does it directly address what was asked?
+
+Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning.</textarea>
+                    </div>
+
+                    <!-- Advanced Settings -->
+                    <div class="accordion mt-4" id="advancedAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#advancedSettings">
+                                    Advanced Settings
+                                </button>
+                            </h2>
+                            <div id="advancedSettings" class="accordion-collapse collapse" data-bs-parent="#advancedAccordion">
+                                <div class="accordion-body">
+                                    <div class="mb-3">
+                                        <label for="additional_params" class="form-label">Additional Parameters (JSON)</label>
+                                        <textarea class="form-control" id="additional_params" name="additional_params" rows="4" placeholder="{}">&#123;&#125;</textarea>
+                                        <small class="form-text text-muted">Provider-specific parameters as JSON</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveBtn">Save Configuration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let editingConfigId = null;
+
+// Provider defaults
+const providerDefaults = {
+    'litellm_openai': {
+        endpoint_url: 'https://api.openai.com/v1/chat/completions',
+        model_name: 'gpt-3.5-turbo',
+        model_help: 'e.g., gpt-3.5-turbo, gpt-4, gpt-4-turbo'
+    },
+    'litellm_anthropic': {
+        endpoint_url: 'https://api.anthropic.com/v1/messages',
+        model_name: 'claude-3-haiku-20240307',
+        model_help: 'e.g., claude-3-haiku-20240307, claude-3-sonnet-20240229'
+    },
+    'litellm_google': {
+        endpoint_url: 'https://generativelanguage.googleapis.com/v1beta/models',
+        model_name: 'gemini-pro',
+        model_help: 'e.g., gemini-pro, gemini-pro-vision'
+    },
+    'litellm_aws': {
+        endpoint_url: 'https://bedrock-runtime.us-east-1.amazonaws.com',
+        model_name: 'anthropic.claude-3-haiku-20240307-v1:0',
+        model_help: 'e.g., anthropic.claude-3-haiku-20240307-v1:0'
+    },
+    'litellm_ollama': {
+        endpoint_url: 'http://localhost:11434',
+        model_name: 'ollama/llama2',
+        model_help: 'e.g., ollama/llama2, ollama/mistral'
+    }
+};
+
+function updateProviderDefaults() {
+    const provider = document.getElementById('connector_type').value;
+    const defaults = providerDefaults[provider];
+    
+    if (defaults) {
+        document.getElementById('endpoint_url').value = defaults.endpoint_url;
+        document.getElementById('model_name').value = defaults.model_name;
+        document.getElementById('model_help').textContent = defaults.model_help;
+    }
+}
+
+function showAlert(message, type = 'info') {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.getElementById('alertContainer').appendChild(alert);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+async function testConfig(configId) {
+    const btn = document.getElementById(`test-btn-${configId}`);
+    const originalText = btn.textContent;
+    
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    
+    try {
+        const response = await fetch(`/api/configs/${configId}/test`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(`✅ Test successful! Response: "${result.test_answer}" (${result.response_time_ms}ms)`, 'success');
+        } else {
+            showAlert(`❌ Test failed: ${result.message}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`❌ Test error: ${error.message}`, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+async function editConfig(configId) {
+    try {
+        const response = await fetch(`/api/configs/${configId}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            const config = result.config;
+            editingConfigId = configId;
+            
+            // Populate form
+            document.getElementById('name').value = config.name;
+            document.getElementById('description').value = config.description;
+            document.getElementById('connector_type').value = config.connector_type;
+            document.getElementById('endpoint_url').value = config.endpoint_url;
+            document.getElementById('api_key').value = config.api_key;
+            document.getElementById('model_name').value = config.model_name;
+            document.getElementById('temperature').value = config.temperature;
+            document.getElementById('max_tokens').value = config.max_tokens;
+            document.getElementById('timeout_seconds').value = config.timeout_seconds;
+            document.getElementById('rate_limit_per_minute').value = config.rate_limit_per_minute;
+            document.getElementById('is_default_judge').checked = config.is_default_judge;
+            document.getElementById('default_judge_prompt').value = config.default_judge_prompt;
+            document.getElementById('llm_as_judge_threshold').value = config.llm_as_judge_threshold;
+            document.getElementById('faithfulness_threshold').value = config.faithfulness_threshold;
+            document.getElementById('additional_params').value = config.additional_params;
+            
+            // Update modal title
+            document.getElementById('configModalTitle').textContent = 'Edit Configuration';
+            document.getElementById('saveBtn').textContent = 'Update Configuration';
+            
+            // Show modal
+            new bootstrap.Modal(document.getElementById('configModal')).show();
+        } else {
+            showAlert(`Error loading configuration: ${result.message}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`Error loading configuration: ${error.message}`, 'danger');
+    }
+}
+
+async function deleteConfig(configId, configName) {
+    if (!confirm(`Are you sure you want to delete the configuration "${configName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/configs/${configId}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Configuration deleted successfully', 'success');
+            // Reload page to update table
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showAlert(`Error deleting configuration: ${result.message}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`Error deleting configuration: ${error.message}`, 'danger');
+    }
+}
+
+// Form submission
+document.getElementById('configForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const saveBtn = document.getElementById('saveBtn');
+    const originalText = saveBtn.textContent;
+    
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    
+    try {
+        const url = editingConfigId ? `/api/configs/${editingConfigId}` : '/api/configs';
+        const method = editingConfigId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            body: formData
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(editingConfigId ? 'Configuration updated successfully' : 'Configuration created successfully', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('configModal')).hide();
+            // Reload page to update table
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showAlert(`Error: ${result.message}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, 'danger');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+    }
+});
+
+// Reset form when modal closes
+document.getElementById('configModal').addEventListener('hidden.bs.modal', function() {
+    editingConfigId = null;
+    document.getElementById('configForm').reset();
+    document.getElementById('configModalTitle').textContent = 'New LLM Configuration';
+    document.getElementById('saveBtn').textContent = 'Save Configuration';
+    document.getElementById('additional_params').value = '{}';
+});
+</script>
+
+<style>
+.table th {
+    border-top: none;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+code {
+    font-size: 0.9em;
+}
+</style>
+
+{% endblock %}

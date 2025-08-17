@@ -6,6 +6,74 @@ import json
 
 from app.database import Base
 
+class LLMConfiguration(Base):
+    __tablename__ = "llm_configurations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(Text)
+    
+    # LLM Provider Settings
+    connector_type = Column(String, nullable=False)  # litellm_openai, litellm_anthropic, etc.
+    endpoint_url = Column(String, nullable=False)
+    api_key = Column(String)  # Encrypted in production
+    model_name = Column(String, nullable=False)
+    
+    # Model Parameters
+    temperature = Column(Float, default=0.7)
+    max_tokens = Column(Integer, default=1000)
+    timeout_seconds = Column(Integer, default=30)
+    rate_limit_per_minute = Column(Integer, default=60)
+    
+    # Additional provider-specific parameters
+    additional_params = Column(JSON)  # For provider-specific configurations
+    
+    # Default judge settings
+    is_default_judge = Column(Boolean, default=False)
+    default_judge_prompt = Column(Text)
+    
+    # Evaluation settings
+    llm_as_judge_threshold = Column(Float, default=0.8)
+    faithfulness_threshold = Column(Float, default=0.8)
+    
+    # Status and metadata
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    @property
+    def display_provider(self):
+        """Get user-friendly provider name"""
+        provider_map = {
+            "litellm_openai": "OpenAI",
+            "litellm_anthropic": "Anthropic", 
+            "litellm_google": "Google",
+            "litellm_aws": "AWS Bedrock",
+            "litellm_azure": "Azure OpenAI",
+            "litellm_ollama": "Ollama",
+            "litellm_cohere": "Cohere",
+            "litellm_replicate": "Replicate",
+            "litellm_huggingface": "HuggingFace",
+            "openai": "OpenAI (Direct)",
+            "http": "Custom HTTP"
+        }
+        return provider_map.get(self.connector_type, self.connector_type)
+    
+    def to_connector_config(self):
+        """Convert to ConnectorConfig object"""
+        from app.connectors import ConnectorConfig
+        return ConnectorConfig(
+            connector_type=self.connector_type,
+            endpoint_url=self.endpoint_url,
+            api_key=self.api_key,
+            model_name=self.model_name,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            timeout_seconds=self.timeout_seconds,
+            rate_limit_per_minute=self.rate_limit_per_minute,
+            additional_params=self.additional_params
+        )
+
 # Reference datasets are now linked to specific agent versions
 class ReferenceDataset(Base):
     __tablename__ = "reference_datasets"

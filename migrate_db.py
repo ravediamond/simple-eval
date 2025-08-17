@@ -112,6 +112,35 @@ def migrate_database():
             ''')
             migrations_applied.append("reference_datasets table")
         
+        # Migration 6: Create llm_configurations table
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='llm_configurations'")
+        if not cursor.fetchone():
+            print("Creating llm_configurations table...")
+            cursor.execute('''
+                CREATE TABLE llm_configurations (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR NOT NULL UNIQUE,
+                    description TEXT,
+                    connector_type VARCHAR NOT NULL,
+                    endpoint_url VARCHAR NOT NULL,
+                    api_key VARCHAR,
+                    model_name VARCHAR NOT NULL,
+                    temperature FLOAT DEFAULT 0.7,
+                    max_tokens INTEGER DEFAULT 1000,
+                    timeout_seconds INTEGER DEFAULT 30,
+                    rate_limit_per_minute INTEGER DEFAULT 60,
+                    additional_params JSON,
+                    is_default_judge BOOLEAN DEFAULT 0,
+                    default_judge_prompt TEXT,
+                    llm_as_judge_threshold FLOAT DEFAULT 0.8,
+                    faithfulness_threshold FLOAT DEFAULT 0.8,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            migrations_applied.append("llm_configurations table")
+        
         # Commit all changes
         conn.commit()
         
