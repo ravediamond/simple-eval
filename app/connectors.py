@@ -331,6 +331,7 @@ class LiteLLMConnector(BaseConnector):
                 "litellm_openai": "OPENAI_API_KEY",
                 "litellm_anthropic": "ANTHROPIC_API_KEY", 
                 "litellm_google": "GOOGLE_API_KEY",
+                "litellm_google_aistudio": "GOOGLE_API_KEY",
                 "litellm_aws": "AWS_ACCESS_KEY_ID",
                 "litellm_azure": "AZURE_API_KEY",
                 "litellm_ollama": "OLLAMA_API_KEY",
@@ -368,8 +369,14 @@ class LiteLLMConnector(BaseConnector):
             prompt = f"Question: {question}\n\nAnswer:"
         
         # Prepare request parameters for LiteLLM
+        model_name = self.config.model_name or self._get_default_model()
+        
+        # Auto-prefix for Google AI Studio provider to use Google AI Studio instead of Vertex AI
+        if self.config.connector_type == "litellm_google_aistudio" and not model_name.startswith("gemini/"):
+            model_name = f"gemini/{model_name}"
+        
         params = {
-            "model": self.config.model_name or self._get_default_model(),
+            "model": model_name,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": self.config.temperature,
             "max_tokens": self.config.max_tokens,
@@ -423,7 +430,8 @@ class LiteLLMConnector(BaseConnector):
         defaults = {
             "litellm_openai": "gpt-3.5-turbo",
             "litellm_anthropic": "claude-3-haiku-20240307",
-            "litellm_google": "gemini/gemini-pro", 
+            "litellm_google": "vertex_ai/gemini-pro",
+            "litellm_google_aistudio": "gemini-pro", 
             "litellm_aws": "anthropic.claude-3-haiku-20240307-v1:0",
             "litellm_azure": "azure/gpt-35-turbo",
             "litellm_ollama": "ollama/llama2",
@@ -458,6 +466,7 @@ class ConnectorFactory:
         "litellm_azure": LiteLLMConnector,
         "litellm_ollama": LiteLLMConnector,
         "litellm_huggingface": LiteLLMConnector,
+        "litellm_google_aistudio": LiteLLMConnector,
     }
     
     @classmethod
