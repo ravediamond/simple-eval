@@ -547,7 +547,7 @@ async def create_agent_legacy(
 
 @app.get("/chatbots/{chatbot_id}", response_class=HTMLResponse)
 async def chatbot_dashboard(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
-    """Chatbot dashboard - MLflow-style chatbot view"""
+    """Chatbot dashboard - Business-friendly view"""
     chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
@@ -561,7 +561,31 @@ async def chatbot_dashboard(request: Request, chatbot_id: int, db: Session = Dep
     # Get runs for this chatbot
     runs = db.query(Run).join(AgentVersion).filter(AgentVersion.agent_id == chatbot_id).order_by(Run.created_at.desc()).all()
     
-    return templates.TemplateResponse("experiment_dashboard.html", {
+    return templates.TemplateResponse("business_dashboard.html", {
+        "request": request,
+        "experiment": chatbot,  # Template still uses experiment variable
+        "current_version": current_version,
+        "reference_datasets": reference_datasets,
+        "runs": runs
+    })
+
+@app.get("/chatbots/{chatbot_id}/technical", response_class=HTMLResponse)
+async def chatbot_technical_dashboard(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
+    """Chatbot technical dashboard - MLflow-style detailed view"""
+    chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    if not chatbot:
+        raise HTTPException(status_code=404, detail="Chatbot not found")
+    
+    # Get current version (latest) and its reference datasets
+    current_version = chatbot.versions[0] if chatbot.versions else None
+    reference_datasets = []
+    if current_version:
+        reference_datasets = current_version.reference_datasets
+    
+    # Get runs for this chatbot
+    runs = db.query(Run).join(AgentVersion).filter(AgentVersion.agent_id == chatbot_id).order_by(Run.created_at.desc()).all()
+    
+    return templates.TemplateResponse("evaluation_dashboard.html", {
         "request": request,
         "experiment": chatbot,  # Template still uses experiment variable
         "current_version": current_version,

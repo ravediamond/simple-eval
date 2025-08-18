@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}🤖 {{ experiment.name }} - Business Dashboard{% endblock %}
+
+{% block content %}
+<!-- Bot Health Header -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center p-4 rounded" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="d-flex align-items-center">
+                <div class="me-4">
+                    <h1 class="mb-1 fw-bold">🤖 {{ experiment.name }}</h1>
+                    <p class="mb-0 opacity-75">Customer Support Bot</p>
+                </div>
+                {% set latest_run = runs|selectattr('status', 'equalto', 'completed')|list|first %}
+                {% if latest_run and latest_run.overall_score %}
+                    {% set health_score = (latest_run.overall_score * 100)|round|int %}
+                    {% if health_score >= 85 %}
+                        <span class="badge bg-success fs-6 px-3 py-2">✅ Healthy</span>
+                    {% elif health_score >= 70 %}
+                        <span class="badge bg-warning fs-6 px-3 py-2">⚠️ Needs Attention</span>
+                    {% else %}
+                        <span class="badge bg-danger fs-6 px-3 py-2">❌ Poor Performance</span>
+                    {% endif %}
+                {% else %}
+                    <span class="badge bg-secondary fs-6 px-3 py-2">📊 No Data</span>
+                {% endif %}
+            </div>
+            <div class="text-end">
+                <a href="/chatbots/{{ experiment.id }}/technical" class="btn btn-light btn-sm opacity-75 me-2">Technical View</a>
+                <a href="/chatbots" class="btn btn-light btn-sm opacity-75">Switch Bot</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Health Overview Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">📊 Health Overview</h5>
+            </div>
+            <div class="card-body p-4">
+                {% if latest_run and latest_run.overall_score %}
+                    {% set health_score = (latest_run.overall_score * 100)|round|int %}
+                    {% set pass_percentage = (latest_run.pass_rate * 100)|round|int %}
+                    {% set total_questions = latest_run.total_test_cases %}
+                    {% set correct_answers = (latest_run.pass_rate * latest_run.total_test_cases)|round|int %}
+                    {% set incorrect_answers = total_questions - correct_answers %}
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="me-4">
+                                    <h2 class="text-primary mb-0 fw-bold">{{ health_score }}%</h2>
+                                    <small class="text-muted">Overall Performance</small>
+                                </div>
+                                <div class="me-4">
+                                    {% if runs|selectattr('status', 'equalto', 'completed')|list|length >= 2 %}
+                                        {% set prev_run = runs|selectattr('status', 'equalto', 'completed')|list|slice(1,2)|first %}
+                                        {% if prev_run and prev_run.overall_score %}
+                                            {% set prev_score = (prev_run.overall_score * 100)|round|int %}
+                                            {% set trend = health_score - prev_score %}
+                                            {% if trend > 0 %}
+                                                <span class="text-success">📈 +{{ trend }}% this evaluation</span>
+                                            {% elif trend < 0 %}
+                                                <span class="text-danger">📉 {{ trend }}% this evaluation</span>
+                                            {% else %}
+                                                <span class="text-muted">➡️ No change</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <small class="text-muted">Last Evaluation: {{ latest_run.completed_at.strftime('%B %d, %Y') if latest_run.completed_at else 'In Progress' }}</small>
+                            </div>
+                            
+                            <div class="d-flex align-items-center">
+                                <div class="me-4">
+                                    <span class="badge bg-success fs-6 px-3 py-1">✅ {{ correct_answers }} correct</span>
+                                </div>
+                                <div>
+                                    <span class="badge bg-danger fs-6 px-3 py-1">❌ {{ incorrect_answers }} incorrect</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="position-relative d-inline-block">
+                                <svg width="120" height="120" viewBox="0 0 120 120">
+                                    <circle cx="60" cy="60" r="54" fill="none" stroke="#e9ecef" stroke-width="8"/>
+                                    <circle cx="60" cy="60" r="54" fill="none" stroke="{% if health_score >= 85 %}#28a745{% elif health_score >= 70 %}#ffc107{% else %}#dc3545{% endif %}" 
+                                            stroke-width="8" stroke-linecap="round"
+                                            stroke-dasharray="{{ (health_score * 339.292 / 100)|round(2) }} 339.292"
+                                            transform="rotate(-90 60 60)"/>
+                                </svg>
+                                <div class="position-absolute top-50 start-50 translate-middle">
+                                    <div class="fw-bold">{{ health_score }}%</div>
+                                    <small class="text-muted">Success</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="text-muted mb-3">
+                            <i class="fs-1">📊</i>
+                        </div>
+                        <h6 class="text-muted mb-3">No evaluation data available</h6>
+                        <p class="text-muted">Run your first evaluation to see performance metrics here.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">🚀 Quick Actions</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="row">
+                    <div class="col-md-6 text-center">
+                        {% if reference_datasets %}
+                            <div class="dropdown">
+                                <button class="btn btn-primary btn-lg px-4 py-3 dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    🔄 Run New Evaluation
+                                </button>
+                                <ul class="dropdown-menu">
+                                    {% for dataset in reference_datasets %}
+                                    <li><a class="dropdown-item" href="/chatbots/{{ experiment.id }}/datasets/{{ dataset.id }}/run">
+                                        {{ dataset.name }} ({{ dataset.row_count }} questions)
+                                    </a></li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% else %}
+                            <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-outline-primary btn-lg px-4 py-3">
+                                📋 Upload Test Questions First
+                            </a>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6 text-center">
+                        {% if latest_run %}
+                            <a href="/runs/{{ latest_run.id }}" class="btn btn-outline-secondary btn-lg px-4 py-3">
+                                📋 View Full Report
+                            </a>
+                        {% else %}
+                            <span class="btn btn-outline-secondary btn-lg px-4 py-3 disabled">
+                                📋 No Reports Available
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Key Insights Section -->
+{% if latest_run and latest_run.aggregate_results %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">💡 Key Insights</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h6 class="mb-3">Top Issues Found:</h6>
+                        {% set issues_found = [] %}
+                        {% for metric_name, metric_data in latest_run.aggregate_results.items() %}
+                            {% if metric_data.pass_rate < 0.8 %}
+                                {% set failure_rate = ((1 - metric_data.pass_rate) * 100)|round|int %}
+                                {% set _ = issues_found.append((metric_name, failure_rate)) %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if issues_found %}
+                            {% for issue_name, failure_rate in issues_found[:3] %}
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="text-danger me-2">•</span>
+                                <span>{{ issue_name|replace('_', ' ')|title }} ({{ failure_rate }}% failure rate)</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-success">
+                                <span class="me-2">✅</span> All metrics performing well!
+                            </div>
+                        {% endif %}
+                        
+                        <div class="mt-4">
+                            <h6 class="mb-3">💡 Recommended Actions:</h6>
+                            {% if issues_found %}
+                                {% for issue_name, failure_rate in issues_found[:2] %}
+                                <div class="d-flex align-items-start mb-2">
+                                    <span class="text-primary me-2">→</span>
+                                    <span>Review and improve {{ issue_name|replace('_', ' ')|lower }} responses</span>
+                                </div>
+                                {% endfor %}
+                                <div class="d-flex align-items-start mb-2">
+                                    <span class="text-primary me-2">→</span>
+                                    <span>Update training data for identified weak areas</span>
+                                </div>
+                            {% else %}
+                                <div class="d-flex align-items-start mb-2">
+                                    <span class="text-success me-2">✅</span>
+                                    <span>Performance is excellent - maintain current approach</span>
+                                </div>
+                                <div class="d-flex align-items-start mb-2">
+                                    <span class="text-primary me-2">→</span>
+                                    <span>Consider testing with more challenging scenarios</span>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <!-- Performance breakdown -->
+                        <h6 class="mb-3">Performance Breakdown:</h6>
+                        {% for metric_name, metric_data in latest_run.aggregate_results.items() %}
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between small">
+                                <span>{{ metric_name|replace('_', ' ')|title }}</span>
+                                <span>{{ (metric_data.pass_rate * 100)|round|int }}%</span>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar bg-{% if metric_data.pass_rate >= 0.8 %}success{% elif metric_data.pass_rate >= 0.6 %}warning{% else %}danger{% endif %}" 
+                                     style="width: {{ (metric_data.pass_rate * 100)|round|int }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Recent Activity Section -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">📅 Recent Activity</h5>
+            </div>
+            <div class="card-body p-4">
+                {% if runs %}
+                    {% for run in runs[:3] %}
+                    <div class="d-flex align-items-center mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}">
+                        <div class="me-3">
+                            {% if run.status == 'completed' %}
+                                {% if run.overall_score >= 0.8 %}
+                                    <span class="text-success fs-5">✅</span>
+                                {% elif run.overall_score >= 0.6 %}
+                                    <span class="text-warning fs-5">⚠️</span>
+                                {% else %}
+                                    <span class="text-danger fs-5">❌</span>
+                                {% endif %}
+                            {% elif run.status == 'running' %}
+                                <span class="text-primary fs-5">🔄</span>
+                            {% else %}
+                                <span class="text-muted fs-5">⏳</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">
+                                {{ run.completed_at.strftime('%B %d') if run.completed_at else run.created_at.strftime('%B %d') }}: 
+                                Evaluation {% if run.status == 'completed' %}completed{% elif run.status == 'running' %}running{% else %}queued{% endif %}
+                                {% if run.overall_score %} - {{ (run.overall_score * 100)|round|int }}% success{% endif %}
+                            </div>
+                            <small class="text-muted">
+                                {{ run.dataset.name if run.dataset else 'Unknown dataset' }}
+                                {% if run.total_test_cases %} • {{ run.total_test_cases }} questions{% endif %}
+                            </small>
+                        </div>
+                        {% if run.status == 'completed' %}
+                        <a href="/runs/{{ run.id }}" class="btn btn-sm btn-outline-primary">View</a>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    
+                    {% if runs|length > 3 %}
+                    <div class="text-center">
+                        <a href="/chatbots/{{ experiment.id }}" class="btn btn-sm btn-outline-secondary">View All Activity</a>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <div class="text-muted mb-3">
+                            <i class="fs-1">📝</i>
+                        </div>
+                        <h6 class="text-muted mb-3">No activity yet</h6>
+                        <p class="text-muted">Your evaluation history will appear here once you start running tests.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced Settings Toggle -->
+<div class="row mt-4">
+    <div class="col-12 text-center">
+        <button class="btn btn-link text-muted" type="button" data-bs-toggle="collapse" data-bs-target="#advancedSettings">
+            ⚙️ Advanced Settings
+        </button>
+    </div>
+</div>
+
+<div class="collapse" id="advancedSettings">
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card border-0 bg-light">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0">⚙️ Technical Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <!-- Original technical content -->
+                    {% if current_version %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Chatbot LLM</h6>
+                            {% if current_version.llm_config %}
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-info me-2">{{ current_version.llm_config.display_provider }}</span>
+                                <code>{{ current_version.llm_config.model_name }}</code>
+                            </div>
+                            <p class="text-muted small mb-0">{{ current_version.llm_config.name }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Judge LLM</h6>
+                            {% if current_version.judge_config %}
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-warning me-2">{{ current_version.judge_config.display_provider }}</span>
+                                <code>{{ current_version.judge_config.model_name }}</code>
+                            </div>
+                            <p class="text-muted small mb-0">{{ current_version.judge_config.name }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6>Datasets ({{ reference_datasets|length }})</h6>
+                            {% if reference_datasets %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Questions</th>
+                                                <th>Created</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for dataset in reference_datasets %}
+                                            <tr>
+                                                <td>{{ dataset.name }}</td>
+                                                <td>{{ dataset.row_count }}</td>
+                                                <td>{{ dataset.created_at.strftime('%Y-%m-%d') }}</td>
+                                                <td>
+                                                    <a href="/chatbots/{{ experiment.id }}/datasets/{{ dataset.id }}/run" class="btn btn-sm btn-primary">Run</a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No datasets uploaded yet.</p>
+                                <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-sm btn-primary">Upload Dataset</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <h6>Recent Evaluations ({{ runs|length }})</h6>
+                            {% if runs %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Status</th>
+                                                <th>Score</th>
+                                                <th>Started</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for run in runs[:5] %}
+                                            <tr>
+                                                <td>{{ run.name }}</td>
+                                                <td>
+                                                    <span class="badge bg-{% if run.status == 'completed' %}success{% elif run.status == 'running' %}primary{% else %}secondary{% endif %}">
+                                                        {{ run.status|title }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {% if run.overall_score %}
+                                                        {{ (run.overall_score * 100)|round|int }}%
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ run.started_at.strftime('%m-%d %H:%M') if run.started_at else run.created_at.strftime('%m-%d %H:%M') }}</td>
+                                                <td>
+                                                    <a href="/runs/{{ run.id }}" class="btn btn-sm btn-outline-primary">View</a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No evaluations yet.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Update navbar to show current experiment
+    document.getElementById('current-experiment').textContent = '{{ experiment.name }}';
+    
+    // Store in localStorage for consistency
+    localStorage.setItem('selectedExperiment', JSON.stringify({
+        id: {{ experiment.id }},
+        name: '{{ experiment.name }}'
+    }));
+});
+</script>
+{% endblock %}
