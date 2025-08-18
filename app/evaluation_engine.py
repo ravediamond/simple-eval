@@ -285,37 +285,23 @@ class EvaluationEngine:
         actual_answer: str,
         expected_answer: Optional[str] = None,
         context: Optional[str] = None,
-        llm_as_judge_enabled: bool = True,
-        faithfulness_enabled: bool = True,
         llm_as_judge_threshold: float = 0.8,
-        faithfulness_threshold: float = 0.8,
         custom_judge_prompt: Optional[str] = None,
         store_verbose_artifacts: bool = False
     ) -> Dict[str, EvaluationResult]:
-        """Evaluate a test case with multiple metrics"""
+        """Evaluate a test case with LLM-as-Judge only"""
         
         results = {}
         
-        # LLM-as-Judge evaluation
-        if llm_as_judge_enabled:
-            llm_judge = LLMAsJudgeMetric(
-                threshold=llm_as_judge_threshold,
-                judge_config=self.judge_config,
-                custom_prompt=custom_judge_prompt
-            )
-            results['llm_as_judge'] = await llm_judge.evaluate(
-                question, actual_answer, expected_answer, context
-            )
-        
-        # Faithfulness evaluation
-        if faithfulness_enabled and context:
-            faithfulness = FaithfulnessMetric(
-                threshold=faithfulness_threshold,
-                judge_config=self.judge_config
-            )
-            results['faithfulness'] = await faithfulness.evaluate(
-                question, actual_answer, expected_answer, context
-            )
+        # LLM-as-Judge evaluation (only metric)
+        llm_judge = LLMAsJudgeMetric(
+            threshold=llm_as_judge_threshold,
+            judge_config=self.judge_config,
+            custom_prompt=custom_judge_prompt
+        )
+        results['llm_as_judge'] = await llm_judge.evaluate(
+            question, actual_answer, expected_answer, context
+        )
         
         # Clean up verbose artifacts if not requested
         if not store_verbose_artifacts:

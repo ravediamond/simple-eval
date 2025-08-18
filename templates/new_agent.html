@@ -56,24 +56,24 @@
                                 <small class="form-text text-muted">This LLM will generate the chatbot responses to be evaluated</small>
                             </div>
                             <div class="col-md-6">
-                                <label for="judge_config_id" class="form-label">Judge LLM Configuration</label>
+                                <label for="judge_config_id" class="form-label">Judge Configuration</label>
                                 <select class="form-select" id="judge_config_id" name="judge_config_id">
-                                    <option value="">Use default judge or same as chatbot</option>
-                                    {% for config in llm_configs %}
-                                    <option value="{{ config.id }}" {% if config.is_default_judge %}selected{% endif %}>
-                                        {{ config.name }} ({{ config.display_provider }} - {{ config.model_name }})
-                                        {% if config.is_default_judge %} - Default Judge{% endif %}
+                                    <option value="">Use default judge</option>
+                                    {% for judge in judge_configs %}
+                                    <option value="{{ judge.id }}" {% if judge.is_default_judge %}selected{% endif %}>
+                                        {{ judge.name }} ({{ judge.base_llm_config.display_provider }} - {{ judge.base_llm_config.model_name }})
+                                        {% if judge.is_default_judge %} - Default{% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>
-                                <small class="form-text text-muted">This LLM will evaluate the chatbot responses. If not selected, will use the default judge configuration.</small>
+                                <small class="form-text text-muted">Judge configurations define how responses are evaluated. If not selected, will use the default judge.</small>
                             </div>
                         </div>
                         
                         <div class="alert alert-info" role="alert">
                             <i class="bi bi-info-circle"></i>
-                            <strong>No LLM configurations available?</strong> 
-                            <a href="/configs" class="alert-link">Create LLM configurations</a> first to use them here.
+                            <strong>Need configurations?</strong> 
+                            Create <a href="/configs" class="alert-link">LLM configurations</a> and <a href="/judges" class="alert-link">judge configurations</a> first to use them here.
                         </div>
                     </div>
 
@@ -87,25 +87,9 @@
                             </h2>
                             <div id="evaluationSettings" class="accordion-collapse collapse show" data-bs-parent="#evaluationAccordion">
                                 <div class="accordion-body">
-                                    <div class="row mb-3">
-                                        <div class="col-md-6">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="llm_as_judge_enabled" name="llm_as_judge_enabled" checked>
-                                                <label class="form-check-label" for="llm_as_judge_enabled">
-                                                    Enable LLM-as-Judge
-                                                </label>
-                                            </div>
-                                            <div class="form-text">Use the same model to evaluate response quality</div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="faithfulness_enabled" name="faithfulness_enabled" checked>
-                                                <label class="form-check-label" for="faithfulness_enabled">
-                                                    Enable Faithfulness
-                                                </label>
-                                            </div>
-                                            <div class="form-text">Measure response adherence to source material</div>
-                                        </div>
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="bi bi-info-circle"></i>
+                                        <strong>Evaluation:</strong> LLM-as-Judge evaluation is enabled by default. This uses the selected judge configuration to evaluate chatbot responses.
                                     </div>
                                     
                                     <div class="mb-3">
@@ -134,83 +118,7 @@ Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain you
                         </div>
                     </div>
 
-                    <!-- Live Evaluation (Collapsible) -->
-                    <div class="accordion mb-4" id="connectorAccordion">
-                        <div class="accordion-item">
-                            <h2 class="accordion-header">
-                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#connectorSettings">
-                                    <strong>Live Evaluation Connector</strong> <span class="text-muted ms-2">(Optional)</span>
-                                </button>
-                            </h2>
-                            <div id="connectorSettings" class="accordion-collapse collapse" data-bs-parent="#connectorAccordion">
-                                <div class="accordion-body">
-                                    <div class="mb-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="connector_enabled" name="connector_enabled" onchange="toggleConnectorConfig()">
-                                            <label class="form-check-label" for="connector_enabled">
-                                                Enable Live Evaluation
-                                            </label>
-                                        </div>
-                                        <div class="form-text">Allow this chatbot to evaluate questions directly via API instead of uploading pre-computed answers</div>
-                                    </div>
-                                    
-                                    <div id="connector_config" style="display: none;">
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label for="connector_type" class="form-label">Connector Type</label>
-                                                <select class="form-select" id="connector_type" name="connector_type">
-                                                    <option value="litellm_openai">LiteLLM OpenAI</option>
-                                                    <option value="litellm_anthropic">LiteLLM Anthropic</option>
-                                                    <option value="litellm_ollama">LiteLLM Ollama</option>
-                                                    <option value="openai">OpenAI (Direct)</option>
-                                                    <option value="http">Generic HTTP</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="connector_endpoint" class="form-label">API Endpoint *</label>
-                                                <input type="url" class="form-control" id="connector_endpoint" name="connector_endpoint" 
-                                                       placeholder="https://api.openai.com/v1/chat/completions">
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <label for="connector_api_key" class="form-label">API Key</label>
-                                                <input type="password" class="form-control" id="connector_api_key" name="connector_api_key" 
-                                                       placeholder="Optional API key">
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="connector_model" class="form-label">Model Name</label>
-                                                <input type="text" class="form-control" id="connector_model" name="connector_model" 
-                                                       placeholder="e.g., gpt-3.5-turbo">
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="row mb-3">
-                                            <div class="col-md-4">
-                                                <label for="connector_timeout" class="form-label">Timeout (seconds)</label>
-                                                <input type="number" class="form-control" id="connector_timeout" name="connector_timeout" 
-                                                       value="30" min="5" max="300">
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label for="connector_rate_limit" class="form-label">Rate Limit (per minute)</label>
-                                                <input type="number" class="form-control" id="connector_rate_limit" name="connector_rate_limit" 
-                                                       value="60" min="1" max="1000">
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">&nbsp;</label>
-                                                <button type="button" class="btn btn-outline-info d-block w-100" onclick="testConnection()">
-                                                    Test Connection
-                                                </button>
-                                            </div>
-                                        </div>
-                                        
-                                        <div id="connection_test_result" class="alert" style="display: none;"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Connector functionality removed - CSV upload only -->
 
                     <!-- Submit -->
                     <div class="row">
@@ -227,72 +135,7 @@ Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain you
 
 <script>
 
-// Connector configuration functions
-function toggleConnectorConfig() {
-    const enabled = document.getElementById('connector_enabled').checked;
-    const config = document.getElementById('connector_config');
-    config.style.display = enabled ? 'block' : 'none';
-    
-    // Reset test result when toggling
-    const testResult = document.getElementById('connection_test_result');
-    testResult.style.display = 'none';
-}
+// Connector functionality removed - CSV upload only
 
-function testConnection() {
-    const connectorType = document.getElementById('connector_type').value;
-    const endpoint = document.getElementById('connector_endpoint').value;
-    const apiKey = document.getElementById('connector_api_key').value;
-    const model = document.getElementById('connector_model').value;
-    const timeout = document.getElementById('connector_timeout').value;
-    
-    if (!endpoint) {
-        showTestResult('Please enter an API endpoint', 'danger');
-        return;
-    }
-    
-    // Show loading state
-    const button = document.querySelector('button[onclick="testConnection()"]');
-    const originalText = button.textContent;
-    button.textContent = 'Testing...';
-    button.disabled = true;
-    
-    // Prepare form data
-    const formData = new FormData();
-    formData.append('connector_type', connectorType);
-    formData.append('endpoint_url', endpoint);
-    formData.append('api_key', apiKey);
-    formData.append('model_name', model);
-    formData.append('timeout_seconds', timeout);
-    
-    fetch('/api/test-connector', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showTestResult(
-                `✅ ${data.message}<br><small>Response: "${data.test_answer}" (${data.response_time_ms}ms)</small>`,
-                'success'
-            );
-        } else {
-            showTestResult(`❌ ${data.message}`, 'danger');
-        }
-    })
-    .catch(error => {
-        showTestResult(`❌ Test failed: ${error.message}`, 'danger');
-    })
-    .finally(() => {
-        button.textContent = originalText;
-        button.disabled = false;
-    });
-}
-
-function showTestResult(message, type) {
-    const testResult = document.getElementById('connection_test_result');
-    testResult.className = `alert alert-${type}`;
-    testResult.innerHTML = message;
-    testResult.style.display = 'block';
-}
 </script>
 {% endblock %}

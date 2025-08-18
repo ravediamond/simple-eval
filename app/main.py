@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 
 from app.database import init_db, get_db
-from app.models import Dataset, DatasetVersion, Agent, AgentVersion, Run, TestCase, MetricResult, ReferenceDataset, LLMConfiguration
+from app.models import Dataset, DatasetVersion, Agent, AgentVersion, Run, TestCase, MetricResult, ReferenceDataset, LLMConfiguration, JudgeConfiguration
 from app.dataset_utils import DatasetProcessor
 from app.run_utils import AnswersProcessor, RunProcessor
 from app.export_utils import RunExporter, ResultsFilter
@@ -102,6 +102,17 @@ async def configs_page(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "configs": configs,
         "available_types": available_types
+    })
+
+@app.get("/judges", response_class=HTMLResponse)
+async def judges_page(request: Request, db: Session = Depends(get_db)):
+    """Judge Configurations page"""
+    judges = db.query(JudgeConfiguration).filter(JudgeConfiguration.is_active == True).order_by(JudgeConfiguration.created_at.desc()).all()
+    llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+    return templates.TemplateResponse("judges.html", {
+        "request": request,
+        "judges": judges,
+        "llm_configs": llm_configs
     })
 
 @app.get("/chatbots/{chatbot_id}/datasets/upload", response_class=HTMLResponse)
@@ -351,9 +362,11 @@ async def preview_dataset(dataset_id: int, version_id: int, db: Session = Depend
 async def new_chatbot_form(request: Request, db: Session = Depends(get_db)):
     """New chatbot form"""
     llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+    judge_configs = db.query(JudgeConfiguration).filter(JudgeConfiguration.is_active == True).all()
     return templates.TemplateResponse("new_agent.html", {
         "request": request,
-        "llm_configs": llm_configs
+        "llm_configs": llm_configs,
+        "judge_configs": judge_configs
     })
 
 @app.get("/agents/new", response_class=HTMLResponse)
@@ -368,17 +381,7 @@ async def create_chatbot(
     description: str = Form(""),
     llm_config_id: int = Form(...),
     judge_config_id: str = Form(""),
-    llm_as_judge_enabled: bool = Form(True),
-    faithfulness_enabled: bool = Form(True),
     judge_prompt: str = Form(""),
-    # Legacy connector fields (deprecated but kept for backward compatibility)
-    connector_enabled: bool = Form(False),
-    connector_type: str = Form("openai"),
-    connector_endpoint: str = Form(""),
-    connector_api_key: str = Form(""),
-    connector_model: str = Form(""),
-    connector_timeout: int = Form(30),
-    connector_rate_limit: int = Form(60),
     # Evaluation settings
     store_verbose_artifacts: bool = Form(False),
     db: Session = Depends(get_db)
@@ -389,9 +392,11 @@ async def create_chatbot(
         llm_config = db.query(LLMConfiguration).filter(LLMConfiguration.id == llm_config_id).first()
         if not llm_config:
             llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+            judge_configs = db.query(JudgeConfiguration).filter(JudgeConfiguration.is_active == True).all()
             return templates.TemplateResponse("new_agent.html", {
                 "request": request,
                 "llm_configs": llm_configs,
+                "judge_configs": judge_configs,
                 "error": "Selected LLM configuration not found"
             })
         
@@ -400,26 +405,30 @@ async def create_chatbot(
         if judge_config_id and judge_config_id.strip():
             try:
                 judge_config_id_int = int(judge_config_id)
-                judge_config = db.query(LLMConfiguration).filter(LLMConfiguration.id == judge_config_id_int).first()
+                judge_config = db.query(JudgeConfiguration).filter(JudgeConfiguration.id == judge_config_id_int).first()
                 if not judge_config:
                     llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+                    judge_configs = db.query(JudgeConfiguration).filter(JudgeConfiguration.is_active == True).all()
                     return templates.TemplateResponse("new_agent.html", {
                         "request": request,
                         "llm_configs": llm_configs,
+                        "judge_configs": judge_configs,
                         "error": "Selected judge configuration not found"
                     })
             except ValueError:
                 llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+                judge_configs = db.query(JudgeConfiguration).filter(JudgeConfiguration.is_active == True).all()
                 return templates.TemplateResponse("new_agent.html", {
                     "request": request,
                     "llm_configs": llm_configs,
+                    "judge_configs": judge_configs,
                     "error": "Invalid judge configuration ID"
                 })
         else:
             # Use default judge if no specific judge config selected
-            judge_config = db.query(LLMConfiguration).filter(
-                LLMConfiguration.is_default_judge == True,
-                LLMConfiguration.is_active == True
+            judge_config = db.query(JudgeConfiguration).filter(
+                JudgeConfiguration.is_default_judge == True,
+                JudgeConfiguration.is_active == True
             ).first()
         
         # Create agent
@@ -431,16 +440,15 @@ async def create_chatbot(
         db.add(agent)
         db.flush()  # Get the ID
         
-        # Set up default thresholds - use judge config thresholds if available
+        # Set up default thresholds - only LLM-as-judge now
         default_thresholds = {
-            "llm_as_judge": judge_config.llm_as_judge_threshold if judge_config else 0.8,
-            "faithfulness": judge_config.faithfulness_threshold if judge_config else 0.8
+            "llm_as_judge": judge_config.llm_as_judge_threshold if judge_config else 0.8
         }
         
         # Use judge prompt from form, or from judge config, or default
         effective_judge_prompt = judge_prompt
-        if not effective_judge_prompt and judge_config and judge_config.default_judge_prompt:
-            effective_judge_prompt = judge_config.default_judge_prompt
+        if not effective_judge_prompt and judge_config and judge_config.judge_prompt:
+            effective_judge_prompt = judge_config.judge_prompt
         if not effective_judge_prompt:
             effective_judge_prompt = """You are an expert evaluator assessing the quality and correctness of AI responses.
 
@@ -452,19 +460,7 @@ Please evaluate the given response to the question on the following criteria:
 
 Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning."""
         
-        # Legacy connector configuration (deprecated)
-        connector_config_dict = None
-        if connector_enabled and connector_endpoint:
-            connector_config_dict = {
-                "connector_type": connector_type,
-                "endpoint_url": connector_endpoint,
-                "api_key": connector_api_key if connector_api_key else None,
-                "model_name": connector_model if connector_model else None,
-                "temperature": 0.7,
-                "max_tokens": 1000,
-                "timeout_seconds": connector_timeout,
-                "rate_limit_per_minute": connector_rate_limit
-            }
+        # Connector functionality removed - CSV upload only
         
         version = AgentVersion(
             agent_id=agent.id,
@@ -474,12 +470,8 @@ Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain you
             judge_config_id=judge_config.id if judge_config else None,
             model_config={},  # Empty dict for new chatbots using LLM configurations
             judge_model_config={},  # Empty dict for new chatbots using LLM configurations
-            llm_as_judge_enabled=llm_as_judge_enabled,
-            faithfulness_enabled=faithfulness_enabled,
             default_thresholds=default_thresholds,
             judge_prompt=effective_judge_prompt,
-            connector_enabled=connector_enabled,
-            connector_config=connector_config_dict,
             store_verbose_artifacts=store_verbose_artifacts
         )
         db.add(version)
@@ -490,9 +482,11 @@ Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain you
     except Exception as e:
         db.rollback()
         llm_configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).all()
+        judge_configs = db.query(JudgeConfiguration).filter(JudgeConfiguration.is_active == True).all()
         return templates.TemplateResponse("new_agent.html", {
             "request": request,
             "llm_configs": llm_configs,
+            "judge_configs": judge_configs,
             "error": f"Error creating chatbot: {str(e)}"
         })
 
@@ -603,54 +597,7 @@ async def agent_detail(request: Request, agent_id: int, db: Session = Depends(ge
     """Legacy agent detail - redirect to chatbot detail"""
     return RedirectResponse(url=f"/chatbots/{agent_id}", status_code=302)
 
-@app.post("/api/test-connector")
-async def test_connector(
-    request: Request,
-    connector_type: str = Form(...),
-    endpoint_url: str = Form(...),
-    api_key: str = Form(""),
-    model_name: str = Form(""),
-    temperature: float = Form(0.7),
-    max_tokens: int = Form(100),
-    timeout_seconds: int = Form(10)
-):
-    """Test a connector configuration"""
-    try:
-        config = ConnectorConfig(
-            connector_type=connector_type,
-            endpoint_url=endpoint_url,
-            api_key=api_key if api_key else None,
-            model_name=model_name if model_name else None,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout_seconds=timeout_seconds,
-            max_retries=1  # Fast test
-        )
-        
-        connector = ConnectorFactory.create_connector(config)
-        
-        async with connector:
-            # Test with a simple question
-            response = await connector.evaluate("What is 2+2? Answer briefly.")
-            
-            if response.success:
-                return JSONResponse({
-                    "success": True,
-                    "message": "Connection successful!",
-                    "test_answer": response.answer,
-                    "response_time_ms": response.response_time_ms
-                })
-            else:
-                return JSONResponse({
-                    "success": False,
-                    "message": f"Connection failed: {response.error_message}"
-                })
-    
-    except Exception as e:
-        return JSONResponse({
-            "success": False,
-            "message": f"Test failed: {str(e)}"
-        })
+# Connector test endpoint removed - CSV upload only
 
 @app.get("/runs", response_class=HTMLResponse)
 async def runs(request: Request, db: Session = Depends(get_db)):
@@ -744,17 +691,7 @@ async def upload_run_answers(
             "datasets": datasets
         })
     
-    # Validate connector configuration for connector mode
-    if evaluation_source == "connector":
-        if not agent_version.connector_enabled or not agent_version.connector_config:
-            agents = db.query(Agent).all()
-            datasets = db.query(Dataset).all()
-            return templates.TemplateResponse("new_run.html", {
-                "request": request,
-                "error": "Selected agent does not have connector configured",
-                "agents": agents,
-                "datasets": datasets
-            })
+    # Connector mode removed - CSV upload only
     
     # Process answers file for upload mode
     errors = []
@@ -786,10 +723,9 @@ async def upload_run_answers(
             "error": f"Error reading dataset: {str(e)}"
         })
     
-    # Validate 100% coverage for upload mode
-    if evaluation_source == "upload":
-        coverage_errors = AnswersProcessor.validate_coverage(answers, dataset_rows)
-        if coverage_errors:
+    # Validate 100% coverage (CSV upload only mode)
+    coverage_errors = AnswersProcessor.validate_coverage(answers, dataset_rows)
+    if coverage_errors:
             agents = db.query(Agent).all()
             datasets = db.query(Dataset).all()
             return templates.TemplateResponse("new_run.html", {
@@ -809,7 +745,7 @@ async def upload_run_answers(
             agent_version_id=agent_version_id,
             dataset_version_id=dataset_version_id,
             status="pending",
-            evaluation_source=evaluation_source
+            evaluation_source="upload"  # Only CSV upload supported
         )
         db.add(run)
         db.commit()
@@ -827,10 +763,8 @@ async def upload_run_answers(
             bg_db = SessionLocal()
             try:
                 run_processor = RunProcessor(bg_db)
-                if evaluation_source == "upload":
-                    loop.run_until_complete(run_processor.start_run(run, answers, dataset_rows))
-                else:  # connector
-                    loop.run_until_complete(run_processor.start_run(run, dataset_rows=dataset_rows))
+                # Only CSV upload mode supported
+                loop.run_until_complete(run_processor.start_run(run, answers, dataset_rows))
             finally:
                 bg_db.close()
                 loop.close()
@@ -1144,10 +1078,6 @@ async def create_llm_config(
     max_tokens: int = Form(1000),
     timeout_seconds: int = Form(30),
     rate_limit_per_minute: int = Form(60),
-    is_default_judge: bool = Form(False),
-    default_judge_prompt: str = Form(""),
-    llm_as_judge_threshold: float = Form(0.8),
-    faithfulness_threshold: float = Form(0.8),
     additional_params: str = Form("{}"),
     db: Session = Depends(get_db)
 ):
@@ -1171,9 +1101,6 @@ async def create_llm_config(
                 "message": "Configuration name already exists"
             }, status_code=400)
         
-        # If this is set as default judge, unset others
-        if is_default_judge:
-            db.query(LLMConfiguration).update({LLMConfiguration.is_default_judge: False})
         
         # Create configuration
         config = LLMConfiguration(
@@ -1187,11 +1114,7 @@ async def create_llm_config(
             max_tokens=max_tokens,
             timeout_seconds=timeout_seconds,
             rate_limit_per_minute=rate_limit_per_minute,
-            additional_params=additional_params_dict,
-            is_default_judge=is_default_judge,
-            default_judge_prompt=default_judge_prompt if default_judge_prompt else None,
-            llm_as_judge_threshold=llm_as_judge_threshold,
-            faithfulness_threshold=faithfulness_threshold
+            additional_params=additional_params_dict
         )
         
         db.add(config)
@@ -1261,10 +1184,6 @@ async def update_llm_config(
     max_tokens: int = Form(1000),
     timeout_seconds: int = Form(30),
     rate_limit_per_minute: int = Form(60),
-    is_default_judge: bool = Form(False),
-    default_judge_prompt: str = Form(""),
-    llm_as_judge_threshold: float = Form(0.8),
-    faithfulness_threshold: float = Form(0.8),
     additional_params: str = Form("{}"),
     db: Session = Depends(get_db)
 ):
@@ -1298,9 +1217,6 @@ async def update_llm_config(
                 "message": "Configuration name already exists"
             }, status_code=400)
         
-        # If this is set as default judge, unset others
-        if is_default_judge and not config.is_default_judge:
-            db.query(LLMConfiguration).update({LLMConfiguration.is_default_judge: False})
         
         # Update configuration
         config.name = name
@@ -1314,10 +1230,6 @@ async def update_llm_config(
         config.timeout_seconds = timeout_seconds
         config.rate_limit_per_minute = rate_limit_per_minute
         config.additional_params = additional_params_dict
-        config.is_default_judge = is_default_judge
-        config.default_judge_prompt = default_judge_prompt if default_judge_prompt else None
-        config.llm_as_judge_threshold = llm_as_judge_threshold
-        config.faithfulness_threshold = faithfulness_threshold
         config.updated_at = datetime.utcnow()
         
         db.commit()
@@ -1387,10 +1299,6 @@ async def get_llm_config(config_id: int, db: Session = Depends(get_db)):
             "timeout_seconds": config.timeout_seconds,
             "rate_limit_per_minute": config.rate_limit_per_minute,
             "additional_params": json.dumps(config.additional_params or {}, indent=2),
-            "is_default_judge": config.is_default_judge,
-            "default_judge_prompt": config.default_judge_prompt or "",
-            "llm_as_judge_threshold": config.llm_as_judge_threshold,
-            "faithfulness_threshold": config.faithfulness_threshold,
             "display_provider": config.display_provider,
             "created_at": config.created_at.isoformat(),
             "updated_at": config.updated_at.isoformat()
@@ -1407,10 +1315,315 @@ async def get_llm_configs(db: Session = Depends(get_db)):
             "name": config.name,
             "description": config.description,
             "display_provider": config.display_provider,
-            "model_name": config.model_name,
-            "is_default_judge": config.is_default_judge
+            "model_name": config.model_name
         }
         for config in configs
+    ]
+
+# Judge Configuration Management APIs
+
+@app.post("/api/judges")
+async def create_judge_config(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    base_llm_config_id: int = Form(...),
+    judge_prompt: str = Form(...),
+    llm_as_judge_threshold: float = Form(0.8),
+    is_default_judge: bool = Form(False),
+    judge_temperature: str = Form(""),
+    judge_max_tokens: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """Create new Judge configuration"""
+    try:
+        # Check if name already exists
+        existing = db.query(JudgeConfiguration).filter(JudgeConfiguration.name == name).first()
+        if existing:
+            return JSONResponse({
+                "success": False,
+                "message": "Judge configuration name already exists"
+            }, status_code=400)
+        
+        # Validate base LLM config exists
+        base_config = db.query(LLMConfiguration).filter(LLMConfiguration.id == base_llm_config_id).first()
+        if not base_config:
+            return JSONResponse({
+                "success": False,
+                "message": "Base LLM configuration not found"
+            }, status_code=400)
+        
+        # Parse optional overrides
+        parsed_temperature = None
+        parsed_max_tokens = None
+        
+        if judge_temperature.strip():
+            try:
+                parsed_temperature = float(judge_temperature)
+            except ValueError:
+                return JSONResponse({
+                    "success": False,
+                    "message": "Invalid temperature value"
+                }, status_code=400)
+        
+        if judge_max_tokens.strip():
+            try:
+                parsed_max_tokens = int(judge_max_tokens)
+            except ValueError:
+                return JSONResponse({
+                    "success": False,
+                    "message": "Invalid max tokens value"
+                }, status_code=400)
+        
+        # If this is set as default judge, unset others
+        if is_default_judge:
+            db.query(JudgeConfiguration).update({JudgeConfiguration.is_default_judge: False})
+        
+        # Create configuration
+        judge = JudgeConfiguration(
+            name=name,
+            description=description,
+            base_llm_config_id=base_llm_config_id,
+            judge_prompt=judge_prompt,
+            llm_as_judge_threshold=llm_as_judge_threshold,
+            is_default_judge=is_default_judge,
+            judge_temperature=parsed_temperature,
+            judge_max_tokens=parsed_max_tokens
+        )
+        
+        db.add(judge)
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Judge configuration created successfully",
+            "judge_id": judge.id
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "message": f"Error creating judge configuration: {str(e)}"
+        }, status_code=500)
+
+@app.post("/api/judges/{judge_id}/test")
+async def test_judge_config(judge_id: int, db: Session = Depends(get_db)):
+    """Test a Judge configuration"""
+    judge = db.query(JudgeConfiguration).filter(JudgeConfiguration.id == judge_id).first()
+    if not judge:
+        return JSONResponse({
+            "success": False,
+            "message": "Judge configuration not found"
+        }, status_code=404)
+    
+    try:
+        connector_config = judge.to_connector_config()
+        connector = ConnectorFactory.create_connector(connector_config)
+        
+        async with connector:
+            # Use the judge prompt with a sample question and answer
+            test_prompt = f"""{judge.judge_prompt}
+
+Question: What is 2+2?
+Answer: 4
+
+Please provide your evaluation:"""
+            
+            response = await connector.evaluate(test_prompt)
+            
+            if response.success:
+                return JSONResponse({
+                    "success": True,
+                    "message": "Judge configuration test successful!",
+                    "test_answer": response.answer,
+                    "response_time_ms": response.response_time_ms,
+                    "provider": response.metadata.get('provider') if response.metadata else judge.base_llm_config.display_provider
+                })
+            else:
+                return JSONResponse({
+                    "success": False,
+                    "message": f"Test failed: {response.error_message}"
+                })
+    
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "message": f"Test failed: {str(e)}"
+        })
+
+@app.put("/api/judges/{judge_id}")
+async def update_judge_config(
+    judge_id: int,
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(""),
+    base_llm_config_id: int = Form(...),
+    judge_prompt: str = Form(...),
+    llm_as_judge_threshold: float = Form(0.8),
+    is_default_judge: bool = Form(False),
+    judge_temperature: str = Form(""),
+    judge_max_tokens: str = Form(""),
+    db: Session = Depends(get_db)
+):
+    """Update Judge configuration"""
+    judge = db.query(JudgeConfiguration).filter(JudgeConfiguration.id == judge_id).first()
+    if not judge:
+        return JSONResponse({
+            "success": False,
+            "message": "Judge configuration not found"
+        }, status_code=404)
+    
+    try:
+        # Check if name already exists (excluding current config)
+        existing = db.query(JudgeConfiguration).filter(
+            JudgeConfiguration.name == name,
+            JudgeConfiguration.id != judge_id
+        ).first()
+        if existing:
+            return JSONResponse({
+                "success": False,
+                "message": "Judge configuration name already exists"
+            }, status_code=400)
+        
+        # Validate base LLM config exists
+        base_config = db.query(LLMConfiguration).filter(LLMConfiguration.id == base_llm_config_id).first()
+        if not base_config:
+            return JSONResponse({
+                "success": False,
+                "message": "Base LLM configuration not found"
+            }, status_code=400)
+        
+        # Parse optional overrides
+        parsed_temperature = None
+        parsed_max_tokens = None
+        
+        if judge_temperature.strip():
+            try:
+                parsed_temperature = float(judge_temperature)
+            except ValueError:
+                return JSONResponse({
+                    "success": False,
+                    "message": "Invalid temperature value"
+                }, status_code=400)
+        
+        if judge_max_tokens.strip():
+            try:
+                parsed_max_tokens = int(judge_max_tokens)
+            except ValueError:
+                return JSONResponse({
+                    "success": False,
+                    "message": "Invalid max tokens value"
+                }, status_code=400)
+        
+        # If this is set as default judge, unset others
+        if is_default_judge and not judge.is_default_judge:
+            db.query(JudgeConfiguration).update({JudgeConfiguration.is_default_judge: False})
+        
+        # Update configuration
+        judge.name = name
+        judge.description = description
+        judge.base_llm_config_id = base_llm_config_id
+        judge.judge_prompt = judge_prompt
+        judge.llm_as_judge_threshold = llm_as_judge_threshold
+        judge.is_default_judge = is_default_judge
+        judge.judge_temperature = parsed_temperature
+        judge.judge_max_tokens = parsed_max_tokens
+        judge.updated_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Judge configuration updated successfully"
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "message": f"Error updating judge configuration: {str(e)}"
+        }, status_code=500)
+
+@app.delete("/api/judges/{judge_id}")
+async def delete_judge_config(judge_id: int, db: Session = Depends(get_db)):
+    """Delete Judge configuration (soft delete)"""
+    judge = db.query(JudgeConfiguration).filter(JudgeConfiguration.id == judge_id).first()
+    if not judge:
+        return JSONResponse({
+            "success": False,
+            "message": "Judge configuration not found"
+        }, status_code=404)
+    
+    try:
+        # Soft delete
+        judge.is_active = False
+        judge.updated_at = datetime.utcnow()
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Judge configuration deleted successfully"
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "message": f"Error deleting judge configuration: {str(e)}"
+        }, status_code=500)
+
+@app.get("/api/judges/{judge_id}")
+async def get_judge_config(judge_id: int, db: Session = Depends(get_db)):
+    """Get Judge configuration details"""
+    judge = db.query(JudgeConfiguration).filter(JudgeConfiguration.id == judge_id).first()
+    if not judge:
+        return JSONResponse({
+            "success": False,
+            "message": "Judge configuration not found"
+        }, status_code=404)
+    
+    return JSONResponse({
+        "success": True,
+        "judge": {
+            "id": judge.id,
+            "name": judge.name,
+            "description": judge.description,
+            "base_llm_config_id": judge.base_llm_config_id,
+            "judge_prompt": judge.judge_prompt,
+            "llm_as_judge_threshold": judge.llm_as_judge_threshold,
+            "is_default_judge": judge.is_default_judge,
+            "judge_temperature": judge.judge_temperature,
+            "judge_max_tokens": judge.judge_max_tokens,
+            "base_llm_config": {
+                "id": judge.base_llm_config.id,
+                "name": judge.base_llm_config.name,
+                "display_provider": judge.base_llm_config.display_provider,
+                "model_name": judge.base_llm_config.model_name
+            },
+            "created_at": judge.created_at.isoformat(),
+            "updated_at": judge.updated_at.isoformat()
+        }
+    })
+
+@app.get("/api/judges")
+async def get_judge_configs(db: Session = Depends(get_db)):
+    """Get all active Judge configurations"""
+    judges = db.query(JudgeConfiguration).filter(JudgeConfiguration.is_active == True).all()
+    return [
+        {
+            "id": judge.id,
+            "name": judge.name,
+            "description": judge.description,
+            "is_default_judge": judge.is_default_judge,
+            "base_llm_config": {
+                "id": judge.base_llm_config.id,
+                "name": judge.base_llm_config.name,
+                "display_provider": judge.base_llm_config.display_provider,
+                "model_name": judge.base_llm_config.model_name
+            }
+        }
+        for judge in judges
     ]
 
 # Additional APIs for complete testing flow

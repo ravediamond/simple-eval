@@ -98,21 +98,10 @@
                         </div>
                     </div>
                     
-                    <div class="row mb-3">
-                        <div class="col-12">
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="evaluation_source" id="upload_mode" value="upload" checked onchange="toggleEvaluationMode()">
-                                <label class="form-check-label" for="upload_mode">
-                                    Upload Answers File
-                                </label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="evaluation_source" id="connector_mode" value="connector" onchange="toggleEvaluationMode()">
-                                <label class="form-check-label" for="connector_mode">
-                                    Live Evaluation (Connector)
-                                </label>
-                            </div>
-                        </div>
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Evaluation Mode:</strong> CSV Upload Only - Upload your chatbot's answers as a CSV file for evaluation.
+                        <input type="hidden" name="evaluation_source" value="upload">
                     </div>
 
                     <!-- Answers File Upload -->

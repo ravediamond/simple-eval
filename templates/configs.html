@@ -25,7 +25,6 @@
                         <th>Provider</th>
                         <th>Model</th>
                         <th>Status</th>
-                        <th>Default Judge</th>
                         <th>Created</th>
                         <th>Actions</th>
                     </tr>
@@ -47,13 +46,6 @@
                         </td>
                         <td>
                             <span class="badge bg-success" id="status-{{ config.id }}">Active</span>
-                        </td>
-                        <td>
-                            {% if config.is_default_judge %}
-                            <span class="badge bg-warning">Default Judge</span>
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
                         </td>
                         <td>
                             <small>{{ config.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
@@ -175,43 +167,6 @@
                         </div>
                     </div>
 
-                    <!-- Judge Settings -->
-                    <h6 class="mt-4">Judge Settings</h6>
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="is_default_judge" name="is_default_judge">
-                                <label class="form-check-label" for="is_default_judge">
-                                    Set as Default Judge
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="llm_as_judge_threshold" class="form-label">LLM Judge Threshold</label>
-                                <input type="number" class="form-control" id="llm_as_judge_threshold" name="llm_as_judge_threshold" min="0" max="1" step="0.01" value="0.8">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="faithfulness_threshold" class="form-label">Faithfulness Threshold</label>
-                                <input type="number" class="form-control" id="faithfulness_threshold" name="faithfulness_threshold" min="0" max="1" step="0.01" value="0.8">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="default_judge_prompt" class="form-label">Default Judge Prompt</label>
-                        <textarea class="form-control" id="default_judge_prompt" name="default_judge_prompt" rows="4" placeholder="Enter the default prompt for LLM-as-Judge evaluation...">You are an expert evaluator assessing the quality and correctness of AI responses.
-
-Please evaluate the given response to the question on the following criteria:
-1. Accuracy: Is the response factually correct?
-2. Completeness: Does it fully answer the question?
-3. Clarity: Is it well-written and understandable?
-4. Relevance: Does it directly address what was asked?
-
-Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning.</textarea>
-                    </div>
 
                     <!-- Advanced Settings -->
                     <div class="accordion mt-4" id="advancedAccordion">
@@ -348,10 +303,6 @@ async function editConfig(configId) {
             document.getElementById('max_tokens').value = config.max_tokens;
             document.getElementById('timeout_seconds').value = config.timeout_seconds;
             document.getElementById('rate_limit_per_minute').value = config.rate_limit_per_minute;
-            document.getElementById('is_default_judge').checked = config.is_default_judge;
-            document.getElementById('default_judge_prompt').value = config.default_judge_prompt;
-            document.getElementById('llm_as_judge_threshold').value = config.llm_as_judge_threshold;
-            document.getElementById('faithfulness_threshold').value = config.faithfulness_threshold;
             document.getElementById('additional_params').value = config.additional_params;
             
             // Update modal title

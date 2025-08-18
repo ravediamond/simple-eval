@@ -1,0 +1,375 @@
+{% extends "base.html" %}
+
+{% block title %}Judge Configurations - Simple Eval{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Judge Configurations</h1>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#judgeModal">
+        <i class="bi bi-plus-circle"></i> New Judge Configuration
+    </button>
+</div>
+
+<!-- Alert for messages -->
+<div id="alertContainer"></div>
+
+<!-- Judges Table -->
+<div class="card">
+    <div class="card-body">
+        {% if judges %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Base LLM</th>
+                        <th>Provider</th>
+                        <th>LLM Judge Threshold</th>
+                        <th>Default Judge</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for judge in judges %}
+                    <tr>
+                        <td>
+                            <strong>{{ judge.name }}</strong>
+                            {% if judge.description %}
+                            <br><small class="text-muted">{{ judge.description }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <code>{{ judge.base_llm_config.name }}</code>
+                            <br><small class="text-muted">{{ judge.base_llm_config.model_name }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ judge.base_llm_config.display_provider }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ judge.llm_as_judge_threshold }}</span>
+                        </td>
+                        <td>
+                            {% if judge.is_default_judge %}
+                            <span class="badge bg-warning">Default</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ judge.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-success" onclick="testJudge({{ judge.id }})" id="test-btn-{{ judge.id }}">
+                                    Test
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" onclick="editJudge({{ judge.id }})">
+                                    Edit
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" onclick="deleteJudge({{ judge.id }}, '{{ judge.name }}')">
+                                    Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <h5 class="text-muted">No judge configurations yet</h5>
+            <p class="text-muted">Create your first judge configuration to enable evaluation</p>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#judgeModal">
+                Create Judge Configuration
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Judge Modal -->
+<div class="modal fade" id="judgeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="judgeModalTitle">New Judge Configuration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="judgeForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Configuration Name *</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="base_llm_config_id" class="form-label">Base LLM Configuration *</label>
+                                <select class="form-select" id="base_llm_config_id" name="base_llm_config_id" required>
+                                    <option value="">Select Base LLM</option>
+                                    {% for llm_config in llm_configs %}
+                                    <option value="{{ llm_config.id }}">{{ llm_config.name }} ({{ llm_config.display_provider }} - {{ llm_config.model_name }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="2"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="judge_prompt" class="form-label">Judge Prompt *</label>
+                        <textarea class="form-control" id="judge_prompt" name="judge_prompt" rows="6" required placeholder="Enter the prompt for LLM-as-Judge evaluation...">You are an expert evaluator assessing the quality and correctness of AI responses.
+
+Please evaluate the given response to the question on the following criteria:
+1. Accuracy: Is the response factually correct?
+2. Completeness: Does it fully answer the question?
+3. Clarity: Is it well-written and understandable?
+4. Relevance: Does it directly address what was asked?
+
+Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning.</textarea>
+                    </div>
+
+                    <!-- Judge Parameters -->
+                    <h6 class="mt-4">Judge Parameters</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="llm_as_judge_threshold" class="form-label">LLM Judge Threshold</label>
+                                <input type="number" class="form-control" id="llm_as_judge_threshold" name="llm_as_judge_threshold" min="0" max="1" step="0.01" value="0.8">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-3" style="margin-top: 2rem;">
+                                <input class="form-check-input" type="checkbox" id="is_default_judge" name="is_default_judge">
+                                <label class="form-check-label" for="is_default_judge">
+                                    Set as Default Judge
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Judge Model Overrides -->
+                    <div class="accordion mt-4" id="judgeAdvancedAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#judgeAdvancedSettings">
+                                    Advanced Judge Settings (Override Base LLM)
+                                </button>
+                            </h2>
+                            <div id="judgeAdvancedSettings" class="accordion-collapse collapse" data-bs-parent="#judgeAdvancedAccordion">
+                                <div class="accordion-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="judge_temperature" class="form-label">Temperature (Judge Override)</label>
+                                                <input type="number" class="form-control" id="judge_temperature" name="judge_temperature" min="0" max="2" step="0.1" placeholder="Leave empty to use base LLM setting">
+                                                <small class="form-text text-muted">Override the base LLM temperature for judge evaluations</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="judge_max_tokens" class="form-label">Max Tokens (Judge Override)</label>
+                                                <input type="number" class="form-control" id="judge_max_tokens" name="judge_max_tokens" min="1" max="100000" placeholder="Leave empty to use base LLM setting">
+                                                <small class="form-text text-muted">Override the base LLM max tokens for judge evaluations</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveJudgeBtn">Save Judge Configuration</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let editingJudgeId = null;
+
+function showAlert(message, type = 'info') {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.getElementById('alertContainer').appendChild(alert);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+async function testJudge(judgeId) {
+    const btn = document.getElementById(`test-btn-${judgeId}`);
+    const originalText = btn.textContent;
+    
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    
+    try {
+        const response = await fetch(`/api/judges/${judgeId}/test`, {
+            method: 'POST'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(`✅ Test successful! Response: "${result.test_answer}" (${result.response_time_ms}ms)`, 'success');
+        } else {
+            showAlert(`❌ Test failed: ${result.message}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`❌ Test error: ${error.message}`, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+async function editJudge(judgeId) {
+    try {
+        const response = await fetch(`/api/judges/${judgeId}`);
+        const result = await response.json();
+        
+        if (result.success) {
+            const judge = result.judge;
+            editingJudgeId = judgeId;
+            
+            // Populate form
+            document.getElementById('name').value = judge.name;
+            document.getElementById('description').value = judge.description;
+            document.getElementById('base_llm_config_id').value = judge.base_llm_config_id;
+            document.getElementById('judge_prompt').value = judge.judge_prompt;
+            document.getElementById('llm_as_judge_threshold').value = judge.llm_as_judge_threshold;
+            document.getElementById('is_default_judge').checked = judge.is_default_judge;
+            document.getElementById('judge_temperature').value = judge.judge_temperature || '';
+            document.getElementById('judge_max_tokens').value = judge.judge_max_tokens || '';
+            
+            // Update modal title
+            document.getElementById('judgeModalTitle').textContent = 'Edit Judge Configuration';
+            document.getElementById('saveJudgeBtn').textContent = 'Update Judge Configuration';
+            
+            // Show modal
+            new bootstrap.Modal(document.getElementById('judgeModal')).show();
+        } else {
+            showAlert(`Error loading judge configuration: ${result.message}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`Error loading judge configuration: ${error.message}`, 'danger');
+    }
+}
+
+async function deleteJudge(judgeId, judgeName) {
+    if (!confirm(`Are you sure you want to delete the judge configuration "${judgeName}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/judges/${judgeId}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Judge configuration deleted successfully', 'success');
+            // Reload page to update table
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showAlert(`Error deleting judge configuration: ${result.message}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`Error deleting judge configuration: ${error.message}`, 'danger');
+    }
+}
+
+// Form submission
+document.getElementById('judgeForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const saveBtn = document.getElementById('saveJudgeBtn');
+    const originalText = saveBtn.textContent;
+    
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    
+    try {
+        const url = editingJudgeId ? `/api/judges/${editingJudgeId}` : '/api/judges';
+        const method = editingJudgeId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            body: formData
+        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(editingJudgeId ? 'Judge configuration updated successfully' : 'Judge configuration created successfully', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('judgeModal')).hide();
+            // Reload page to update table
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showAlert(`Error: ${result.message}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`Error: ${error.message}`, 'danger');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+    }
+});
+
+// Reset form when modal closes
+document.getElementById('judgeModal').addEventListener('hidden.bs.modal', function() {
+    editingJudgeId = null;
+    document.getElementById('judgeForm').reset();
+    document.getElementById('judgeModalTitle').textContent = 'New Judge Configuration';
+    document.getElementById('saveJudgeBtn').textContent = 'Save Judge Configuration';
+    // Reset default text
+    document.getElementById('judge_prompt').value = `You are an expert evaluator assessing the quality and correctness of AI responses.
+
+Please evaluate the given response to the question on the following criteria:
+1. Accuracy: Is the response factually correct?
+2. Completeness: Does it fully answer the question?
+3. Clarity: Is it well-written and understandable?
+4. Relevance: Does it directly address what was asked?
+
+Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning.`;
+});
+</script>
+
+<style>
+.table th {
+    border-top: none;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+code {
+    font-size: 0.9em;
+}
+</style>
+
+{% endblock %}

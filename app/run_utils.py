@@ -319,16 +319,13 @@ class RunProcessor:
         evaluation_engine = EvaluationEngine(judge_config)
         
         try:
-            # Evaluate test case with real metrics
+            # Evaluate test case with LLM-as-judge only
             metric_results = await evaluation_engine.evaluate_test_case(
                 question=test_case.question,
                 actual_answer=test_case.actual_answer,
                 expected_answer=test_case.expected_answer,
                 context=test_case.context,
-                llm_as_judge_enabled=agent_version.llm_as_judge_enabled,
-                faithfulness_enabled=agent_version.faithfulness_enabled,
                 llm_as_judge_threshold=llm_as_judge_threshold,
-                faithfulness_threshold=faithfulness_threshold,
                 custom_judge_prompt=custom_prompt,
                 store_verbose_artifacts=agent_version.store_verbose_artifacts or False
             )

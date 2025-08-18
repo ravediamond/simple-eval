@@ -28,13 +28,6 @@ class LLMConfiguration(Base):
     # Additional provider-specific parameters
     additional_params = Column(JSON)  # For provider-specific configurations
     
-    # Default judge settings
-    is_default_judge = Column(Boolean, default=False)
-    default_judge_prompt = Column(Text)
-    
-    # Evaluation settings
-    llm_as_judge_threshold = Column(Float, default=0.8)
-    faithfulness_threshold = Column(Float, default=0.8)
     
     # Status and metadata
     is_active = Column(Boolean, default=True)
@@ -72,6 +65,49 @@ class LLMConfiguration(Base):
             timeout_seconds=self.timeout_seconds,
             rate_limit_per_minute=self.rate_limit_per_minute,
             additional_params=self.additional_params
+        )
+
+class JudgeConfiguration(Base):
+    __tablename__ = "judge_configurations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(Text)
+    
+    # Base LLM Configuration reference
+    base_llm_config_id = Column(Integer, ForeignKey("llm_configurations.id"), nullable=False)
+    
+    # Judge-specific settings
+    judge_prompt = Column(Text, nullable=False)
+    llm_as_judge_threshold = Column(Float, default=0.8)
+    # faithfulness metrics removed for simplicity
+    
+    # Judge model parameters (overrides base config if provided)
+    judge_temperature = Column(Float)  # Override temperature for judge
+    judge_max_tokens = Column(Integer)  # Override max_tokens for judge
+    
+    # Status and metadata
+    is_default_judge = Column(Boolean, default=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    base_llm_config = relationship("LLMConfiguration", foreign_keys=[base_llm_config_id])
+    
+    def to_connector_config(self):
+        """Convert to ConnectorConfig object using base LLM config with judge overrides"""
+        from app.connectors import ConnectorConfig
+        return ConnectorConfig(
+            connector_type=self.base_llm_config.connector_type,
+            endpoint_url=self.base_llm_config.endpoint_url,
+            api_key=self.base_llm_config.api_key,
+            model_name=self.base_llm_config.model_name,
+            temperature=self.judge_temperature if self.judge_temperature is not None else self.base_llm_config.temperature,
+            max_tokens=self.judge_max_tokens if self.judge_max_tokens is not None else self.base_llm_config.max_tokens,
+            timeout_seconds=self.base_llm_config.timeout_seconds,
+            rate_limit_per_minute=self.base_llm_config.rate_limit_per_minute,
+            additional_params=self.base_llm_config.additional_params
         )
 
 # Reference datasets are now linked to specific agent versions
@@ -158,14 +194,13 @@ class AgentVersion(Base):
     
     # LLM Configuration references
     llm_config_id = Column(Integer, ForeignKey("llm_configurations.id"), nullable=True)  # For chatbot inference
-    judge_config_id = Column(Integer, ForeignKey("llm_configurations.id"), nullable=True)  # For evaluation judge
+    judge_config_id = Column(Integer, ForeignKey("judge_configurations.id"), nullable=True)  # For evaluation judge
     
     # Legacy model configuration (kept for backward compatibility)
     model_config = Column(JSON, nullable=True)  # {provider, model, temperature, max_tokens, etc}
     
-    # Metric toggles
-    llm_as_judge_enabled = Column(Boolean, default=True)
-    faithfulness_enabled = Column(Boolean, default=True)
+    # LLM-as-judge is the only evaluation metric now
+    # faithfulness and other metrics removed for simplicity
     
     # Default thresholds
     default_thresholds = Column(JSON)  # {metric_name: threshold_value}
@@ -176,9 +211,7 @@ class AgentVersion(Base):
     # Editable judge prompt (overrides LLM config default if provided)
     judge_prompt = Column(Text)
     
-    # Connector configuration for live evaluation (deprecated - use llm_config instead)
-    connector_enabled = Column(Boolean, default=False)
-    connector_config = Column(JSON)  # ConnectorConfig as JSON
+    # Connector functionality removed - CSV upload only
     
     # Evaluation configuration
     store_verbose_artifacts = Column(Boolean, default=False)  # Store judge prompts/responses
@@ -186,7 +219,7 @@ class AgentVersion(Base):
     # Relationships
     agent = relationship("Agent", back_populates="versions")
     llm_config = relationship("LLMConfiguration", foreign_keys=[llm_config_id])
-    judge_config = relationship("LLMConfiguration", foreign_keys=[judge_config_id])
+    judge_config = relationship("JudgeConfiguration", foreign_keys=[judge_config_id])
     reference_datasets = relationship("ReferenceDataset", back_populates="agent_version", cascade="all, delete-orphan")
     runs = relationship("Run", foreign_keys="Run.agent_version_id", back_populates="agent_version")
     
