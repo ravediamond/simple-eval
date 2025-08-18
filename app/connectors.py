@@ -330,11 +330,10 @@ class LiteLLMConnector(BaseConnector):
             env_mapping = {
                 "litellm_openai": "OPENAI_API_KEY",
                 "litellm_anthropic": "ANTHROPIC_API_KEY", 
-                "litellm_google": "GOOGLE_APPLICATION_CREDENTIALS",
+                "litellm_google": "GOOGLE_API_KEY",
                 "litellm_aws": "AWS_ACCESS_KEY_ID",
                 "litellm_azure": "AZURE_API_KEY",
-                "litellm_cohere": "COHERE_API_KEY",
-                "litellm_replicate": "REPLICATE_API_TOKEN",
+                "litellm_ollama": "OLLAMA_API_KEY",
                 "litellm_huggingface": "HUGGINGFACE_API_KEY"
             }
             
@@ -385,6 +384,12 @@ class LiteLLMConnector(BaseConnector):
             params["api_base"] = self.config.endpoint_url
         
         try:
+            # Debug logging for Google authentication
+            if self.config.connector_type == "litellm_google":
+                print(f"Debug - Model: {params['model']}")
+                print(f"Debug - GOOGLE_API_KEY set: {'GOOGLE_API_KEY' in os.environ}")
+                print(f"Debug - GOOGLE_APPLICATION_CREDENTIALS set: {'GOOGLE_APPLICATION_CREDENTIALS' in os.environ}")
+            
             # Make async call to LiteLLM
             response = await acompletion(**params)
             response_time_ms = int((time.time() - start_time) * 1000)
@@ -418,12 +423,10 @@ class LiteLLMConnector(BaseConnector):
         defaults = {
             "litellm_openai": "gpt-3.5-turbo",
             "litellm_anthropic": "claude-3-haiku-20240307",
-            "litellm_google": "gemini-pro", 
+            "litellm_google": "gemini/gemini-pro", 
             "litellm_aws": "anthropic.claude-3-haiku-20240307-v1:0",
             "litellm_azure": "azure/gpt-35-turbo",
             "litellm_ollama": "ollama/llama2",
-            "litellm_cohere": "cohere/command-r",
-            "litellm_replicate": "replicate/meta/llama-2-70b-chat:latest",
             "litellm_huggingface": "huggingface/microsoft/DialoGPT-medium"
         }
         return defaults.get(self.config.connector_type, "gpt-3.5-turbo")
@@ -454,8 +457,6 @@ class ConnectorFactory:
         "litellm_aws": LiteLLMConnector,
         "litellm_azure": LiteLLMConnector,
         "litellm_ollama": LiteLLMConnector,
-        "litellm_cohere": LiteLLMConnector,
-        "litellm_replicate": LiteLLMConnector,
         "litellm_huggingface": LiteLLMConnector,
     }
     

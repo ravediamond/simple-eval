@@ -44,8 +44,6 @@ class LLMConfiguration(Base):
             "litellm_aws": "AWS Bedrock",
             "litellm_azure": "Azure OpenAI",
             "litellm_ollama": "Ollama",
-            "litellm_cohere": "Cohere",
-            "litellm_replicate": "Replicate",
             "litellm_huggingface": "HuggingFace",
             "openai": "OpenAI (Direct)",
             "http": "Custom HTTP"
