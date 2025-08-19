@@ -39,14 +39,14 @@
                         </div>
                     </div>
 
-                    <!-- LLM Configuration Selection -->
+                    <!-- AI Setup Selection -->
                     <div class="mb-4">
-                        <h5 class="mb-3">LLM Configuration</h5>
+                        <h5 class="mb-3">AI Setup</h5>
                         <p class="text-muted small mb-3">Select pre-configured LLM providers for chatbot inference and evaluation</p>
                         
                         <div class="row mb-3">
                             <div class="col-md-6">
-                                <label for="llm_config_id" class="form-label">Chatbot LLM Configuration *</label>
+                                <label for="llm_config_id" class="form-label">Chatbot AI Setup *</label>
                                 <select class="form-select" id="llm_config_id" name="llm_config_id" required>
                                     <option value="">Select LLM configuration for chatbot responses</option>
                                     {% for config in llm_configs %}

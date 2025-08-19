@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Upload Evaluation Dataset - EvalNow{% endblock %}
+{% block title %}Upload Evaluation Question Set - EvalNow{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Upload Evaluation Dataset</h1>
-            <a href="/datasets" class="btn btn-secondary">Back to Evaluation Datasets</a>
+            <h1>Upload Evaluation Question Set</h1>
+            <a href="/datasets" class="btn btn-secondary">Back to Evaluation Evaluation Questions</a>
         </div>
         <p class="text-muted">Upload a CSV or JSONL file with questions and reference answers</p>
     </div>
@@ -70,12 +70,12 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5>Evaluation Dataset Information</h5>
+                <h5>Evaluation Question Set Information</h5>
             </div>
             <div class="card-body">
                 <form method="post" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="name" class="form-label">Evaluation Dataset Name</label>
+                        <label for="name" class="form-label">Evaluation Question Set Name</label>
                         <input type="text" class="form-control" id="name" name="name" 
                                value="{{ name or '' }}" required>
                         <div class="form-text">A descriptive name for your evaluation dataset</div>
@@ -89,13 +89,13 @@
                     </div>
                     
                     <div class="mb-3">
-                        <label for="file" class="form-label">Evaluation Dataset File</label>
+                        <label for="file" class="form-label">Evaluation Question Set File</label>
                         <input type="file" class="form-control" id="file" name="file" 
                                accept=".csv,.jsonl" required>
                         <div class="form-text">CSV or JSONL file with 'question' and 'reference' columns</div>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary">Upload Evaluation Dataset</button>
+                    <button type="submit" class="btn btn-primary">Upload Evaluation Question Set</button>
                 </form>
             </div>
         </div>

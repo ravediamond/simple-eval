@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}LLM Configurations - EvalNow{% endblock %}
+{% block title %}AI Setups - EvalNow{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>LLM Configurations</h1>
+    <h1>AI Setups</h1>
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#configModal">
         <i class="bi bi-plus-circle"></i> New Configuration
     </button>
@@ -85,7 +85,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="configModalTitle">New LLM Configuration</h5>
+                <h5 class="modal-title" id="configModalTitle">New AI Setup</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="configForm">
@@ -383,7 +383,7 @@ document.getElementById('configForm').addEventListener('submit', async function(
 document.getElementById('configModal').addEventListener('hidden.bs.modal', function() {
     editingConfigId = null;
     document.getElementById('configForm').reset();
-    document.getElementById('configModalTitle').textContent = 'New LLM Configuration';
+    document.getElementById('configModalTitle').textContent = 'New AI Setup';
     document.getElementById('saveBtn').textContent = 'Save Configuration';
     document.getElementById('additional_params').value = '{}';
 });

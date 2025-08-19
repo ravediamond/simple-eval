@@ -22,7 +22,7 @@
                         + New
                     </button>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="/chatbots/{{ experiment.id }}/datasets/upload">Upload Dataset</a></li>
+                        <li><a class="dropdown-item" href="/chatbots/{{ experiment.id }}/datasets/upload">Upload Question Set</a></li>
                         <li><hr class="dropdown-divider"></li>
                         {% for dataset in reference_datasets %}
                         <li><a class="dropdown-item" href="/chatbots/{{ experiment.id }}/datasets/{{ dataset.id }}/run">
@@ -45,7 +45,7 @@
         <div class="card text-center">
             <div class="card-body">
                 <h3 class="text-primary">{{ reference_datasets|length }}</h3>
-                <p class="card-text">Datasets</p>
+                <p class="card-text">Evaluation Questions</p>
             </div>
         </div>
     </div>
@@ -87,7 +87,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">LLM Configuration</h5>
+                <h5 class="mb-0">AI Setup</h5>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -152,14 +152,14 @@
 </div>
 {% endif %}
 
-<!-- Datasets Section -->
+<!-- Evaluation Questions Section -->
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Datasets</h5>
-                    <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-sm btn-outline-primary">+ Upload Dataset</a>
+                    <h5 class="mb-0">Evaluation Questions</h5>
+                    <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-sm btn-outline-primary">+ Upload Question Set</a>
                 </div>
             </div>
             <div class="card-body">
@@ -168,7 +168,7 @@
                         <table class="table table-sm">
                             <thead>
                                 <tr>
-                                    <th>Dataset Name</th>
+                                    <th>Question Set Name</th>
                                     <th>Rows</th>
                                     <th>Created</th>
                                     <th>Actions</th>
@@ -198,7 +198,7 @@
                 {% else %}
                     <div class="text-center py-4">
                         <p class="text-muted">No datasets uploaded for this experiment yet.</p>
-                        <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-primary">Upload Your First Dataset</a>
+                        <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-primary">Upload Your First Question Set</a>
                     </div>
                 {% endif %}
             </div>
@@ -220,7 +220,7 @@
                             <thead>
                                 <tr>
                                     <th>Run Name</th>
-                                    <th>Dataset</th>
+                                    <th>Question Set</th>
                                     <th>Status</th>
                                     <th>Overall Score</th>
                                     <th>Pass Rate</th>
@@ -312,7 +312,7 @@
                                 {% endfor %}
                             </div>
                         {% else %}
-                            <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-primary">Upload Dataset First</a>
+                            <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-primary">Upload Question Set First</a>
                         {% endif %}
                     </div>
                 {% endif %}

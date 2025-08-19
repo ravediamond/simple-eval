@@ -96,7 +96,7 @@ async def datasets(request: Request, db: Session = Depends(get_db)):
 
 @app.get("/configs", response_class=HTMLResponse)
 async def configs_page(request: Request, db: Session = Depends(get_db)):
-    """LLM Configurations page"""
+    """AI Setup page"""
     configs = db.query(LLMConfiguration).filter(LLMConfiguration.is_active == True).order_by(LLMConfiguration.created_at.desc()).all()
     available_types = ConnectorFactory.get_available_types()
     return templates.TemplateResponse("configs.html", {
@@ -1091,7 +1091,7 @@ def _recalculate_run_aggregates(run: Run, db: Session):
     
     run.aggregate_results = aggregate_results
 
-# LLM Configuration Management APIs
+# AI Setup Management APIs
 
 @app.post("/api/configs")
 async def create_llm_config(

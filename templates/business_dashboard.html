@@ -363,7 +363,7 @@
                     
                     <div class="row mt-3">
                         <div class="col-12">
-                            <h6>Datasets ({{ reference_datasets|length }})</h6>
+                            <h6>Evaluation Questions ({{ reference_datasets|length }})</h6>
                             {% if reference_datasets %}
                                 <div class="table-responsive">
                                     <table class="table table-sm">
@@ -391,7 +391,7 @@
                                 </div>
                             {% else %}
                                 <p class="text-muted">No datasets uploaded yet.</p>
-                                <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-sm btn-primary">Upload Dataset</a>
+                                <a href="/chatbots/{{ experiment.id }}/datasets/upload" class="btn btn-sm btn-primary">Upload Question Set</a>
                             {% endif %}
                         </div>
                     </div>

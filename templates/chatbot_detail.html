@@ -46,7 +46,7 @@
                     {% if not reference_datasets %}
                     <li><span class="dropdown-item-text text-muted">No datasets uploaded yet</span></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="/chatbots/{{ agent.id }}/datasets/upload">Upload Evaluation Dataset</a></li>
+                    <li><a class="dropdown-item" href="/chatbots/{{ agent.id }}/datasets/upload">Upload Evaluation Question Set</a></li>
                     {% endif %}
                 </ul>
                 
@@ -159,14 +159,14 @@
     </div>
 </div>
 
-<!-- Evaluation Datasets for This Chatbot -->
+<!-- Evaluation Evaluation Questions for This Chatbot -->
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Evaluation Datasets</h5>
-                    <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-sm btn-outline-primary">+ Upload New Evaluation Dataset</a>
+                    <h5 class="mb-0">Evaluation Evaluation Questions</h5>
+                    <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-sm btn-outline-primary">+ Upload New Evaluation Question Set</a>
                 </div>
             </div>
             <div class="card-body">
@@ -183,7 +183,7 @@
                                     <strong>Created:</strong> {{ dataset.created_at.strftime('%Y-%m-%d') }}
                                 </div>
                                 <div class="d-flex gap-1">
-                                    <button class="btn btn-sm btn-outline-info" onclick="previewDataset({{ dataset.id }}, '{{ dataset.name }}')">
+                                    <button class="btn btn-sm btn-outline-info" onclick="previewQuestion Set({{ dataset.id }}, '{{ dataset.name }}')">
                                         Preview
                                     </button>
                                     <a href="/chatbots/{{ agent.id }}/datasets/{{ dataset.id }}/run" class="btn btn-sm btn-primary">
@@ -199,7 +199,7 @@
                 <div class="text-center py-4">
                     <p class="text-muted">No reference datasets uploaded for this chatbot version yet.</p>
                     {% if current_version %}
-                        <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-primary">Upload Your First Evaluation Dataset</a>
+                        <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-primary">Upload Your First Evaluation Question Set</a>
                     {% else %}
                         <p class="text-muted small">Create a chatbot version first to upload datasets.</p>
                     {% endif %}
@@ -224,7 +224,7 @@
                         <thead>
                             <tr>
                                 <th>Run Name</th>
-                                <th>Evaluation Dataset</th>
+                                <th>Evaluation Question Set</th>
                                 <th>Status</th>
                                 <th>Overall Score</th>
                                 <th>Pass Rate</th>
@@ -337,7 +337,7 @@ function changeVersion() {
     window.location.href = url.toString();
 }
 
-async function previewDataset(datasetId, datasetName) {
+async function previewQuestion Set(datasetId, datasetName) {
     const modal = new bootstrap.Modal(document.getElementById('datasetPreviewModal'));
     const content = document.getElementById('datasetPreviewContent');
     const title = document.getElementById('datasetPreviewTitle');
@@ -394,12 +394,12 @@ async function previewDataset(datasetId, datasetName) {
 }
 </script>
 
-<!-- Dataset Preview Modal -->
+<!-- Question Set Preview Modal -->
 <div class="modal fade" id="datasetPreviewModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="datasetPreviewTitle">Dataset Preview</h5>
+                <h5 class="modal-title" id="datasetPreviewTitle">Question Set Preview</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">

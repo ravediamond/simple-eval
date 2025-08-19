@@ -72,8 +72,8 @@
                     
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="dataset_id" class="form-label">Dataset *</label>
-                            <select class="form-select" id="dataset_id" name="dataset_id" required onchange="updateDatasetVersions()">
+                            <label for="dataset_id" class="form-label">Question Set *</label>
+                            <select class="form-select" id="dataset_id" name="dataset_id" required onchange="updateQuestion SetVersions()">
                                 <option value="">Select a dataset</option>
                                 {% for dataset in datasets %}
                                     <option value="{{ dataset.id }}">
@@ -83,7 +83,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label for="dataset_version_id" class="form-label">Dataset Version *</label>
+                            <label for="dataset_version_id" class="form-label">Question Set Version *</label>
                             <select class="form-select" id="dataset_version_id" name="dataset_version_id" required>
                                 <option value="">Select dataset first</option>
                             </select>
@@ -327,7 +327,7 @@ function updateAgentVersions() {
     }
 }
 
-function updateDatasetVersions() {
+function updateQuestion SetVersions() {
     const datasetSelect = document.getElementById('dataset_id');
     const versionSelect = document.getElementById('dataset_version_id');
     
@@ -356,7 +356,7 @@ document.addEventListener('DOMContentLoaded', function() {
     {% endif %}
     
     {% if selected_dataset_version %}
-    updateDatasetVersions();
+    updateQuestion SetVersions();
     document.getElementById('dataset_version_id').value = {{ selected_dataset_version }};
     {% endif %}
 });

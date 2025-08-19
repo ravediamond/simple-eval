@@ -20,15 +20,15 @@ poetry run uvicorn app.main:app --reload --port 8000
 **Application URL**: http://localhost:8000
 
 ### First Steps
-1. **Upload a Dataset** → http://localhost:8000/datasets/upload
+1. **Upload Evaluation Questions** → http://localhost:8000/datasets/upload
 2. **Create an Agent** → http://localhost:8000/agents/new  
-3. **Create a Run** → http://localhost:8000/runs/new
+3. **Create a Test Attempt** → http://localhost:8000/runs/new
 
 ### Available Pages
-- **Dashboard**: http://localhost:8000/ - Overview and recent runs
+- **Dashboard**: http://localhost:8000/ - Overview and recent test attempts
 - **Agents**: http://localhost:8000/agents - Agent management
-- **Datasets**: http://localhost:8000/datasets - Dataset management
-- **Runs**: http://localhost:8000/runs - Evaluation runs
+- **Evaluation Questions**: http://localhost:8000/datasets - Question set management
+- **Test Attempts**: http://localhost:8000/runs - Evaluation attempts
 
 ## What We're Building (MVP)
 
@@ -38,7 +38,7 @@ A local-first evaluation platform that lets you:
 - **Two Evaluation Modes**:
   1. **Connector** - App queries the agent live and scores responses
   2. **Uploaded Answers** - Upload pre-generated answers for scoring only
-- **Upload Datasets** - Questions + verified reference answers with optional contexts
+- **Upload Evaluation Questions** - Questions + verified reference answers with optional contexts
 - **View Results** - Per-case scores, pass/fail status, explanations, and aggregate metrics
 - **Version Control** - Immutable snapshots of Agents and Datasets for reproducible evaluations
 
