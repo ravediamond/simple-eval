@@ -1,99 +1,198 @@
 {% extends "base.html" %}
 
-{% block title %}Chatbots - EvalNow{% endblock %}
+{% block title %}My Chatbots - EvalNow{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1>Chatbots</h1>
-            <a href="/chatbots/new" class="btn btn-primary">+ Create New Chatbot</a>
+<!-- Page Header -->
+<div class="page-header mb-4">
+    <div class="row">
+        <div class="col-12 text-center">
+            <h1 class="display-6 mb-2">My Chatbots</h1>
+            <p class="text-muted mb-4">Test and improve your AI assistants</p>
         </div>
-        <p class="text-muted">Choose a chatbot to view its datasets and evaluation runs</p>
     </div>
 </div>
 
-<div class="row mt-4">
+<!-- Main Content -->
+<div class="row">
     <div class="col-12">
         {% if agents %}
-            <div class="row">
+            <!-- Primary Action -->
+            <div class="text-center mb-5">
+                <a href="/runs/new" class="btn btn-primary btn-lg px-5 py-3 main-action-btn">
+                    🚀 Test a Bot
+                </a>
+                <div class="mt-3">
+                    <a href="/chatbots/new" class="btn btn-outline-primary">+ Add New Bot</a>
+                </div>
+            </div>
+            
+            <!-- Bot Cards -->
+            <div class="bot-grid">
                 {% for agent in agents %}
-                <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 chatbot-card" onclick="location.href='/chatbots/{{ agent.id }}'">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h5 class="card-title mb-0">{{ agent.name }}</h5>
-                                <div class="d-flex align-items-center gap-2">
-                                    {% if agent.versions %}
-                                        <span class="badge bg-info">{{ agent.versions[0].display_name }}</span>
-                                    {% endif %}
-                                    <button class="btn btn-sm btn-outline-danger" 
-                                            onclick="event.stopPropagation(); deleteChatbot({{ agent.id }}, '{{ agent.name }}')"
-                                            title="Delete chatbot">
-                                        🗑️
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <p class="card-text text-muted">
-                                {{ agent.description or "No description" }}
-                            </p>
-                            
-                            {% if agent.tags %}
-                            <div class="mb-3">
-                                {% for tag in agent.tags %}
-                                    <span class="badge bg-secondary me-1">{{ tag }}</span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                            
-                            {% if agent.versions %}
-                            <div class="text-muted small mb-2">
-                                <strong>Latest Model:</strong> {{ agent.versions[0].model_config.provider }}/{{ agent.versions[0].model_config.model }}
-                            </div>
-                            {% endif %}
-                            
-                            <div class="text-muted small">
-                                Created: {{ agent.created_at.strftime('%Y-%m-%d') }}
-                            </div>
-                        </div>
-                        <div class="card-footer bg-light">
-                            <div class="d-flex justify-content-between text-muted small">
-                                <span>📊 Evaluation Evaluation Questions: ?</span>
-                                <span>🏃 Runs: ?</span>
-                            </div>
-                        </div>
+                <div class="bot-card" onclick="location.href='/chatbots/{{ agent.id }}'">
+                    <div class="bot-card-header">
+                        <h5 class="bot-name">{{ agent.name }}</h5>
+                        <button class="btn btn-sm btn-outline-secondary delete-btn" 
+                                onclick="event.stopPropagation(); deleteChatbot({{ agent.id }}, '{{ agent.name }}')"
+                                title="Delete">
+                            ×
+                        </button>
+                    </div>
+                    
+                    {% if agent.description %}
+                    <p class="bot-description">{{ agent.description }}</p>
+                    {% endif %}
+                    
+                    <div class="bot-stats">
+                        <span class="stat-badge">📊 0 tests</span>
+                        {% if agent.versions %}
+                        <span class="stat-badge">🤖 {{ agent.versions[0].model_config.provider }}</span>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
             </div>
         {% else %}
-            <div class="card text-center py-5">
-                <div class="card-body">
-                    <h4 class="text-muted">No Chatbots Yet</h4>
-                    <p class="text-muted">Create your first chatbot to start evaluating</p>
-                    <a href="/chatbots/new" class="btn btn-primary">+ Create Your First Chatbot</a>
-                </div>
+            <!-- Welcome State -->
+            <div class="welcome-state">
+                <div class="welcome-icon">🤖</div>
+                <h3>Create Your First Chatbot</h3>
+                <p class="text-muted mb-4">Set up a bot to test its performance with real questions</p>
+                <a href="/chatbots/new" class="btn btn-primary btn-lg px-5 py-3 main-action-btn">
+                    🤖 Create My First Bot
+                </a>
             </div>
         {% endif %}
     </div>
 </div>
 
+{% endblock %}
+
+{% block styles %}
 <style>
-.chatbot-card {
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+/* Clean chatbots page styles */
+.page-header {
+    padding: 2rem 0 1rem;
 }
 
-.chatbot-card:hover {
+.main-action-btn {
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-radius: 50px;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+    transition: all 0.3s ease;
+}
+
+.main-action-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
 }
 
-.chatbot-card:active {
-    transform: translateY(0);
+.bot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.bot-card {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.bot-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    border-color: #0d6efd;
+}
+
+.bot-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.bot-name {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    color: #212529;
+}
+
+.delete-btn {
+    opacity: 0.6;
+    font-size: 1.2rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.delete-btn:hover {
+    opacity: 1;
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.bot-description {
+    color: #6c757d;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.bot-stats {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-badge {
+    background: #f8f9fa;
+    color: #495057;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.welcome-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.welcome-icon {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+}
+
+.welcome-state h3 {
+    color: #212529;
+    margin-bottom: 1rem;
+}
+
+/* Remove card borders globally for cleaner look */
+.card {
+    border: none !important;
 }
 </style>
+{% endblock %}
+
+{% block scripts %}
 
 <script>
 async function deleteChatbot(chatbotId, chatbotName) {
@@ -123,5 +222,4 @@ async function deleteChatbot(chatbotId, chatbotName) {
     }
 }
 </script>
-
 {% endblock %}

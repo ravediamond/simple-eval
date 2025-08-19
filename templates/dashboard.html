@@ -3,181 +3,295 @@
 {% block title %}Dashboard - EvalNow{% endblock %}
 
 {% block content %}
+<!-- Hero Section with Main Performance Indicator -->
+<div class="hero-section mb-5">
+    <div class="row">
+        <div class="col-12">
+            {% if recent_runs and recent_runs[0].status == 'completed' %}
+                <!-- Latest Result Card - Big and Bold -->
+                <div class="performance-card text-center mb-4">
+                    <div class="performance-score">
+                        {% if recent_runs[0].overall_score >= 0.9 %}
+                            <div class="score-excellent">
+                                <div class="score-number">{{ "%.0f"|format(recent_runs[0].overall_score * 100) }}%</div>
+                                <div class="score-label">Excellent! ✅</div>
+                            </div>
+                        {% elif recent_runs[0].overall_score >= 0.7 %}
+                            <div class="score-good">
+                                <div class="score-number">{{ "%.0f"|format(recent_runs[0].overall_score * 100) }}%</div>
+                                <div class="score-label">Good work! 👍</div>
+                            </div>
+                        {% else %}
+                            <div class="score-needs-work">
+                                <div class="score-number">{{ "%.0f"|format(recent_runs[0].overall_score * 100) }}%</div>
+                                <div class="score-label">Needs improvement 📈</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="performance-details">
+                        <p class="performance-subtitle">Your <strong>{{ recent_runs[0].agent_version.agent.name }}</strong> chatbot's latest performance</p>
+                        <small class="text-muted">Tested {{ recent_runs[0].created_at.strftime('%B %d') }} with {{ recent_runs[0].dataset_version.dataset.name }}</small>
+                    </div>
+                </div>
+            {% else %}
+                <!-- Welcome Card for New Users -->
+                <div class="welcome-card text-center mb-4">
+                    <div class="welcome-icon">🤖</div>
+                    <h2>Welcome to EvalNow!</h2>
+                    <p class="lead">Test how well your chatbot answers questions</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Primary Action Section -->
+<div class="row mb-5">
+    <div class="col-12 text-center">
+        {% if agents %}
+            <a href="/runs/new" class="btn btn-primary btn-lg px-5 py-3 main-action-btn">
+                🚀 Test My Bot
+            </a>
+            <div class="mt-3">
+                <small class="text-muted">or <a href="/chatbots">manage your bots</a></small>
+            </div>
+        {% else %}
+            <a href="/chatbots/new" class="btn btn-primary btn-lg px-5 py-3 main-action-btn">
+                🤖 Create My First Bot
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Secondary Actions - Only if needed -->
+{% if not agents %}
 <div class="row">
+    <div class="col-md-6 offset-md-3">
+        <div class="getting-started-card">
+            <h5>Getting Started is Easy:</h5>
+            <div class="step-list">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <span class="step-text">Create a chatbot to test</span>
+                </div>
+                <div class="step">
+                    <span class="step-number">2</span>
+                    <span class="step-text">Upload questions with correct answers</span>
+                </div>
+                <div class="step">
+                    <span class="step-number">3</span>
+                    <span class="step-text">Run the test and see results</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Quick Stats - Minimal and Clean -->
+{% if agents and recent_runs %}
+<div class="row mt-5">
     <div class="col-12">
-        <h1>Dashboard</h1>
-        <p class="text-muted">Welcome to EvalNow - your lightweight chatbot evaluation platform</p>
-    </div>
-</div>
-
-<!-- Summary Stats -->
-<div class="row mt-4">
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-primary">{{ total_agents }}</h2>
-                <p class="card-text">Chatbots</p>
-                <a href="/chatbots" class="btn btn-sm btn-outline-primary">View All</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-success">{{ total_datasets }}</h2>
-                <p class="card-text">Evaluation Evaluation Questions</p>
-                <a href="/chatbots" class="btn btn-sm btn-outline-success">View All</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-info">{{ total_runs }}</h2>
-                <p class="card-text">Evaluations</p>
-                <a href="/chatbots" class="btn btn-sm btn-outline-info">Start New</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Quick Start Guide -->
-<div class="row mt-4">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Quick Start Guide</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <div class="display-6">🤖</div>
-                            <h6>1. Create Chatbot</h6>
-                            <p class="small text-muted">Define what you want to test</p>
-                            <a href="/chatbots/new" class="btn btn-sm btn-primary">Create Chatbot</a>
-                        </div>
+        <div class="quick-stats">
+            <h6 class="text-muted mb-3">Quick Overview</h6>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ total_agents }}</span>
+                        <span class="stat-label">Chatbot{{ "s" if total_agents != 1 else "" }}</span>
                     </div>
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <div class="display-6">📊</div>
-                            <h6>2. Upload Evaluation Question Set</h6>
-                            <p class="small text-muted">Questions & reference answers</p>
-                            <a href="/datasets/upload" class="btn btn-sm btn-success">Upload Evaluation Question Set</a>
-                        </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ total_runs }}</span>
+                        <span class="stat-label">Test{{ "s" if total_runs != 1 else "" }} Run</span>
                     </div>
-                    <div class="col-md-4">
-                        <div class="text-center mb-3">
-                            <div class="display-6">🚀</div>
-                            <h6>3. Start Evaluation</h6>
-                            <p class="small text-muted">Test & get detailed results</p>
-                            <a href="/chatbots" class="btn btn-sm btn-info">Choose Chatbot</a>
-                        </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ total_datasets }}</span>
+                        <span class="stat-label">Question Set{{ "s" if total_datasets != 1 else "" }}</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Recent Activity</h5>
-            </div>
-            <div class="card-body">
-                {% if recent_runs %}
-                    {% for run in recent_runs[:3] %}
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div>
-                            <small><strong>{{ run.agent_version.agent.name }}</strong></small><br>
-                            <small class="text-muted">vs {{ run.dataset_version.dataset.name }}</small>
-                        </div>
-                        <div>
-                            {% if run.status == 'completed' %}
-                                <span class="badge bg-success">Done</span>
-                            {% elif run.status == 'running' %}
-                                <span class="badge bg-primary">Running</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Pending</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                    <a href="/chatbots" class="btn btn-sm btn-outline-primary w-100 mt-2">View All Chatbots</a>
-                {% else %}
-                    <p class="text-muted small">No evaluations yet. Start by creating a chatbot!</p>
-                    <a href="/chatbots/new" class="btn btn-sm btn-primary w-100">Create First Chatbot</a>
-                {% endif %}
-            </div>
-        </div>
-    </div>
 </div>
+{% endif %}
 
-<!-- Recent Runs -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Recent Runs</h5>
-                    <a href="/runs" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
+<!-- Settings Link - Tucked Away -->
+{% if agents %}
+<div class="row mt-5">
+    <div class="col-12 text-center">
+        <details class="settings-details">
+            <summary class="text-muted">⚙️ Advanced Settings</summary>
+            <div class="mt-3">
+                <a href="/configs" class="btn btn-outline-secondary btn-sm me-2">AI Setup</a>
+                <a href="/datasets" class="btn btn-outline-secondary btn-sm me-2">Evaluation Questions</a>
+                <a href="/runs" class="btn btn-outline-secondary btn-sm">View All Tests</a>
             </div>
-            <div class="card-body">
-                {% if recent_runs %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Agent</th>
-                                    <th>Evaluation Question Set</th>
-                                    <th>Status</th>
-                                    <th>Score</th>
-                                    <th>Created</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for run in recent_runs %}
-                                <tr>
-                                    <td>
-                                        <a href="/runs/{{ run.id }}" class="text-decoration-none">
-                                            {{ run.name }}
-                                        </a>
-                                    </td>
-                                    <td>{{ run.agent_version.agent.name }}</td>
-                                    <td>{{ run.dataset_version.dataset.name }}</td>
-                                    <td>
-                                        {% if run.status == 'completed' %}
-                                            <span class="badge bg-success">Completed</span>
-                                        {% elif run.status == 'running' %}
-                                            <span class="badge bg-primary">Running</span>
-                                        {% elif run.status == 'failed' %}
-                                            <span class="badge bg-danger">Failed</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">Pending</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if run.overall_score is not none %}
-                                            <span class="badge bg-{% if run.overall_score >= 0.8 %}success{% elif run.overall_score >= 0.6 %}warning{% else %}danger{% endif %}">
-                                                {{ "%.2f"|format(run.overall_score) }}
-                                            </span>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ run.created_at.strftime('%m-%d %H:%M') }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <p class="text-muted">No runs yet. <a href="/runs/new">Create your first run</a> to start evaluating.</p>
-                {% endif %}
-            </div>
-        </div>
+        </details>
     </div>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block styles %}
+<style>
+/* Clean, friendly dashboard styles */
+.hero-section {
+    padding: 2rem 0;
+}
+
+.performance-card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.performance-score {
+    margin-bottom: 1.5rem;
+}
+
+.score-number {
+    font-size: 4rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.score-label {
+    font-size: 1.5rem;
+    font-weight: 500;
+    margin-top: 0.5rem;
+}
+
+.score-excellent .score-number { color: #28a745; }
+.score-good .score-number { color: #fd7e14; }
+.score-needs-work .score-number { color: #dc3545; }
+
+.performance-subtitle {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: #495057;
+}
+
+.welcome-card {
+    background: white;
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.welcome-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.main-action-btn {
+    font-size: 1.3rem;
+    font-weight: 600;
+    border-radius: 50px;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+    transition: all 0.3s ease;
+}
+
+.main-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(13, 110, 253, 0.4);
+}
+
+.getting-started-card {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.step-list {
+    margin-top: 1.5rem;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    background: #0d6efd;
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+    margin-right: 1rem;
+    flex-shrink: 0;
+}
+
+.step-text {
+    font-weight: 500;
+}
+
+.quick-stats {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.stat-item {
+    text-align: center;
+    padding: 1rem;
+}
+
+.stat-number {
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0d6efd;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.settings-details {
+    margin-top: 2rem;
+}
+
+.settings-details summary {
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0.5rem;
+}
+
+.settings-details summary:hover {
+    color: #0d6efd !important;
+}
+
+/* Reduce visual noise */
+.card {
+    border: none !important;
+}
+
+.btn-outline-secondary {
+    border-color: #dee2e6;
+    color: #6c757d;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #f8f9fa;
+    border-color: #adb5bd;
+    color: #495057;
+}
+</style>
 {% endblock %}

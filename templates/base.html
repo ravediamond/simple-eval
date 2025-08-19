@@ -4,147 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}EvalNow{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='/public/favicon.ico') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="{{ url_for('static', path='/css/style.css') }}" rel="stylesheet">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="/chatbots">EvalNow</a>
+            <a class="navbar-brand d-flex align-items-center" href="/chatbots">
+                <img src="{{ url_for('static', path='/public/icon.png') }}" alt="EvalNow" height="40" class="me-2">
+                EvalNow
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="/chatbots">Chatbots</a>
+                        <a class="nav-link" href="/chatbots">My Bots</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/configs">AI Models</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/judges">Judges</a>
+                        <a class="nav-link" href="/runs">Tests</a>
                     </li>
                 </ul>
                 
-                <!-- Chatbot Selector (like MLflow) -->
+                <!-- Quick Action -->
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="chatbotDropdown" role="button" data-bs-toggle="dropdown">
-                            <strong>Chatbot:</strong> <span id="current-experiment">None Selected</span>
-                        </a>
-                        <ul class="dropdown-menu" id="chatbot-selector">
-                            <li><a class="dropdown-item" href="/chatbots">Select Chatbot...</a></li>
-                        </ul>
+                    <li class="nav-item">
+                        <a class="nav-link btn btn-primary btn-sm text-white px-3" href="/runs/new">🚀 Test Bot</a>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <div class="d-flex">
-        <!-- Left Sidebar -->
-        <nav class="bg-light border-end" style="width: 250px; min-height: calc(100vh - 56px);">
-            <div class="p-3">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="mb-0 text-muted">CHATBOTS</h6>
-                    <a href="/chatbots/new" class="btn btn-sm btn-outline-primary" title="Create New Chatbot">+</a>
-                </div>
-                <div id="chatbots-sidebar">
-                    <!-- Will be populated by JavaScript -->
-                </div>
-            </div>
-        </nav>
-
-        <!-- Main Content -->
-        <main class="flex-grow-1 p-4">
-            {% block content %}{% endblock %}
-        </main>
-    </div>
+    <!-- Main Content -->
+    <main class="container-fluid py-4">
+        {% block content %}{% endblock %}
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     
-    <script>
-    // Load chatbots in sidebar
-    async function loadChatbotsSidebar() {
-        try {
-            const response = await fetch('/api/chatbots');
-            const chatbots = await response.json();
-            const sidebar = document.getElementById('chatbots-sidebar');
-            
-            if (chatbots.length === 0) {
-                sidebar.innerHTML = '<p class="text-muted small">No chatbots yet</p>';
-                return;
-            }
-            
-            // Get current chatbot from URL
-            const currentPath = window.location.pathname;
-            const currentChatbotId = currentPath.includes('/chatbots/') ? 
-                parseInt(currentPath.split('/chatbots/')[1]) : null;
-            
-            const sidebarHtml = chatbots.map(bot => `
-                <div class="chatbot-item mb-2 ${bot.id === currentChatbotId ? 'active' : ''}" 
-                     onclick="selectChatbotFromSidebar(${bot.id}, '${bot.name}')">
-                    <div class="p-2 rounded ${bot.id === currentChatbotId ? 'bg-primary text-white' : 'hover-bg-light'}">
-                        <div class="fw-semibold small">${bot.name}</div>
-                        <div class="text-muted small">
-                            v${bot.latest_version} • ${bot.dataset_count} eval datasets • ${bot.run_count} runs
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            
-            sidebar.innerHTML = sidebarHtml;
-            
-            // Update navbar chatbot selector
-            const currentBot = chatbots.find(b => b.id === currentChatbotId);
-            if (currentBot) {
-                document.getElementById('current-experiment').textContent = currentBot.name;
-            }
-            
-        } catch (error) {
-            console.error('Failed to load chatbots:', error);
-            document.getElementById('chatbots-sidebar').innerHTML = 
-                '<p class="text-danger small">Failed to load chatbots</p>';
-        }
-    }
-    
-    function selectChatbotFromSidebar(chatbotId, chatbotName) {
-        // Store selected chatbot
-        localStorage.setItem('selectedChatbot', JSON.stringify({
-            id: chatbotId,
-            name: chatbotName
-        }));
-        
-        // Navigate to chatbot
-        window.location.href = `/chatbots/${chatbotId}`;
-    }
-    
-    // Load sidebar on page load
-    document.addEventListener('DOMContentLoaded', loadChatbotsSidebar);
-    </script>
-    
-    <style>
-    .chatbot-item {
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    
-    .hover-bg-light:hover {
-        background-color: rgba(0,0,0,0.05) !important;
-    }
-    
-    .chatbot-item.active .hover-bg-light {
-        background-color: var(--bs-primary) !important;
-        color: white !important;
-    }
-    
-    .chatbot-item.active .text-muted {
-        color: rgba(255,255,255,0.8) !important;
-    }
-    </style>
-    
+    {% block styles %}{% endblock %}
     {% block scripts %}{% endblock %}
 </body>
 </html>
