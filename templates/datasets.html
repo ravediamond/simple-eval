@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Datasets - Simple Eval{% endblock %}
+{% block title %}Evaluation Datasets - Simple Eval{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Datasets</h1>
-            <a href="/datasets/upload" class="btn btn-primary">Upload Dataset</a>
+            <h1>Evaluation Datasets</h1>
+            <a href="/datasets/upload" class="btn btn-primary">Upload Evaluation Dataset</a>
         </div>
         <p class="text-muted">Upload and manage your evaluation datasets</p>
     </div>
@@ -71,9 +71,9 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body text-center">
-                <h5>No datasets uploaded yet</h5>
-                <p class="text-muted">Upload your first dataset to start evaluating.</p>
-                <a href="/datasets/upload" class="btn btn-primary">Upload Dataset</a>
+                <h5>No evaluation datasets uploaded yet</h5>
+                <p class="text-muted">Upload your first evaluation dataset to start evaluating.</p>
+                <a href="/datasets/upload" class="btn btn-primary">Upload Evaluation Dataset</a>
             </div>
         </div>
     </div>
@@ -85,7 +85,7 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Dataset Preview</h5>
+                <h5 class="modal-title">Evaluation Dataset Preview</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
@@ -132,7 +132,6 @@ function showPreview(datasetId, versionId) {
                     <table class="table table-striped">
                         <thead>
                             <tr>
-                                <th>ID</th>
                                 <th>Question</th>
                                 <th>Reference</th>
                             </tr>
@@ -140,7 +139,6 @@ function showPreview(datasetId, versionId) {
                         <tbody>
                             ${data.rows.map(row => `
                                 <tr>
-                                    <td>${row.id}</td>
                                     <td>${row.question.length > 200 ? row.question.substring(0, 200) + '...' : row.question}</td>
                                     <td>${row.reference.length > 200 ? row.reference.substring(0, 200) + '...' : row.reference}</td>
                                 </tr>

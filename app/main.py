@@ -541,20 +541,33 @@ async def create_agent_legacy(
     return await create_chatbot(request, name, description, tags, model_provider, model_name, temperature, max_tokens, llm_as_judge_enabled, faithfulness_enabled, judge_model_provider, judge_model_name, judge_temperature, endpoint_url, api_key, judge_endpoint_url, judge_api_key, db)
 
 @app.get("/chatbots/{chatbot_id}", response_class=HTMLResponse)
-async def chatbot_dashboard(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
-    """Chatbot dashboard - Business-friendly view"""
+async def chatbot_overview(request: Request, chatbot_id: int, version: int = None, db: Session = Depends(get_db)):
+    """Chatbot overview - High-level summary view"""
     chatbot = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
-    # Get current version (latest) and its reference datasets
-    current_version = chatbot.versions[0] if chatbot.versions else None
+    # Get current version - either specified version or latest
+    if version:
+        current_version = db.query(AgentVersion).filter(
+            AgentVersion.id == version, 
+            AgentVersion.agent_id == chatbot_id
+        ).first()
+        if not current_version:
+            # Fall back to latest if specified version not found
+            current_version = chatbot.versions[0] if chatbot.versions else None
+    else:
+        current_version = chatbot.versions[0] if chatbot.versions else None
+    
     reference_datasets = []
     if current_version:
         reference_datasets = current_version.reference_datasets
     
-    # Get runs for this chatbot
-    runs = db.query(Run).join(AgentVersion).filter(AgentVersion.agent_id == chatbot_id).order_by(Run.created_at.desc()).all()
+    # Get runs for this chatbot version (or all runs if no specific version)
+    if version and current_version:
+        runs = db.query(Run).filter(Run.agent_version_id == current_version.id).order_by(Run.created_at.desc()).all()
+    else:
+        runs = db.query(Run).join(AgentVersion).filter(AgentVersion.agent_id == chatbot_id).order_by(Run.created_at.desc()).all()
     
     return templates.TemplateResponse("business_dashboard.html", {
         "request": request,
@@ -564,9 +577,9 @@ async def chatbot_dashboard(request: Request, chatbot_id: int, db: Session = Dep
         "runs": runs
     })
 
-@app.get("/chatbots/{chatbot_id}/technical", response_class=HTMLResponse)
-async def chatbot_technical_dashboard(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
-    """Chatbot technical dashboard - MLflow-style detailed view"""
+@app.get("/chatbots/{chatbot_id}/detailed", response_class=HTMLResponse)
+async def chatbot_detailed(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
+    """Chatbot detailed view - In-depth technical information"""
     chatbot = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
@@ -592,6 +605,11 @@ async def chatbot_technical_dashboard(request: Request, chatbot_id: int, db: Ses
 async def experiment_redirect(request: Request, experiment_id: int, db: Session = Depends(get_db)):
     """Legacy redirect to chatbot dashboard"""
     return RedirectResponse(url=f"/chatbots/{experiment_id}", status_code=302)
+
+@app.get("/chatbots/{chatbot_id}/technical", response_class=HTMLResponse)
+async def chatbot_technical_redirect(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
+    """Legacy redirect from technical to detailed view"""
+    return RedirectResponse(url=f"/chatbots/{chatbot_id}/detailed", status_code=302)
 
 @app.get("/agents/{agent_id}", response_class=HTMLResponse)
 async def agent_detail(request: Request, agent_id: int, db: Session = Depends(get_db)):
@@ -645,7 +663,7 @@ async def upload_run_answers(
     request: Request,
     name: str = Form(...),
     agent_version_id: int = Form(...),
-    dataset_version_id: int = Form(...),
+    reference_dataset_id: int = Form(...),
     evaluation_source: str = Form("upload"),
     file: UploadFile = File(None),
     db: Session = Depends(get_db)
@@ -678,11 +696,11 @@ async def upload_run_answers(
                 "datasets": datasets
             })
     
-    # Get agent and dataset versions
+    # Get agent version and reference dataset
     agent_version = db.query(AgentVersion).filter(AgentVersion.id == agent_version_id).first()
-    dataset_version = db.query(DatasetVersion).filter(DatasetVersion.id == dataset_version_id).first()
+    reference_dataset = db.query(ReferenceDataset).filter(ReferenceDataset.id == reference_dataset_id).first()
     
-    if not agent_version or not dataset_version:
+    if not agent_version or not reference_dataset:
         agents = db.query(Agent).all()
         datasets = db.query(Dataset).all()
         return templates.TemplateResponse("new_run.html", {
@@ -709,13 +727,13 @@ async def upload_run_answers(
                 "datasets": datasets,
                 "name": name,
                 "selected_agent_version": agent_version_id,
-                "selected_dataset_version": dataset_version_id
+                "selected_reference_dataset": reference_dataset_id
             })
     
     # Load dataset rows for validation
     try:
         dataset_rows = []
-        with open(dataset_version.file_path, 'r', encoding='utf-8') as f:
+        with open(reference_dataset.file_path, 'r', encoding='utf-8') as f:
             for line in f:
                 dataset_rows.append(json.loads(line))
     except Exception as e:
@@ -736,7 +754,7 @@ async def upload_run_answers(
                 "datasets": datasets,
                 "name": name,
                 "selected_agent_version": agent_version_id,
-                "selected_dataset_version": dataset_version_id
+                "selected_reference_dataset": reference_dataset_id
             })
     
     # Create run
@@ -744,9 +762,9 @@ async def upload_run_answers(
         run = Run(
             name=name,
             agent_version_id=agent_version_id,
-            dataset_version_id=dataset_version_id,
+            reference_dataset_id=reference_dataset_id,
             status="pending",
-            evaluation_source="upload"  # Only CSV upload supported
+            evaluation_source=evaluation_source
         )
         db.add(run)
         db.commit()
@@ -763,9 +781,18 @@ async def upload_run_answers(
             from app.database import SessionLocal
             bg_db = SessionLocal()
             try:
+                # Get fresh run object in background session
+                bg_run = bg_db.query(Run).filter(Run.id == run.id).first()
+                if not bg_run:
+                    return
+                
                 run_processor = RunProcessor(bg_db)
-                # Only CSV upload mode supported
-                loop.run_until_complete(run_processor.start_run(run, answers, dataset_rows))
+                if evaluation_source == "upload":
+                    # CSV upload mode - use provided answers
+                    loop.run_until_complete(run_processor.start_run(bg_run, answers, dataset_rows))
+                else:
+                    # Connector mode - run live evaluation
+                    loop.run_until_complete(run_processor.start_run(bg_run, None, dataset_rows))
             finally:
                 bg_db.close()
                 loop.close()
@@ -1892,6 +1919,46 @@ async def get_chatbot_api(chatbot_id: int, db: Session = Depends(get_db)):
             ]
         }
     })
+
+@app.get("/api/datasets/{dataset_id}/preview")
+async def preview_dataset_api(dataset_id: int, db: Session = Depends(get_db)):
+    """API endpoint to preview dataset contents"""
+    reference_dataset = db.query(ReferenceDataset).filter(ReferenceDataset.id == dataset_id).first()
+    if not reference_dataset:
+        return JSONResponse({
+            "success": False,
+            "message": "Dataset not found"
+        }, status_code=404)
+    
+    # Load and parse the dataset content
+    try:
+        import json
+        rows = []
+        if reference_dataset.file_path and reference_dataset.file_path.endswith('.jsonl'):
+            with open(reference_dataset.file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        row = json.loads(line)
+                        rows.append({
+                            "question": row.get("question", ""),
+                            "reference": row.get("reference", "")
+                        })
+        
+        # Limit to first 10 rows for preview
+        preview_rows = rows[:10]
+        
+        return JSONResponse({
+            "success": True,
+            "total_rows": len(rows),
+            "rows": preview_rows,
+            "created_at": reference_dataset.created_at.strftime('%Y-%m-%d %H:%M')
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "message": f"Error reading dataset: {str(e)}"
+        }, status_code=500)
 
 @app.delete("/api/chatbots/{chatbot_id}")
 async def delete_chatbot(chatbot_id: int, db: Session = Depends(get_db)):

@@ -127,13 +127,13 @@
                         <label for="file" class="form-label">Answers File *</label>
                         <input type="file" class="form-control" id="file" name="file" accept=".csv,.jsonl">
                         <div class="form-text">
-                            Upload a CSV or JSONL file with columns: <code>id</code>, <code>answer</code>. 
+                            Upload a CSV or JSONL file with columns: <code>question</code>, <code>answer</code>. 
                             Must cover all {{ reference_dataset.row_count }} test cases.
                         </div>
                     </div>
 
                     <!-- Preview Section -->
-                    {% if agent.versions and dataset.versions %}
+                    {% if agent.versions and reference_dataset %}
                     <div class="alert alert-info">
                         <h6 class="mb-2">📋 What will happen:</h6>
                         <ol class="mb-0">

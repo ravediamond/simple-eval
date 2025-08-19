@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Upload Dataset - Simple Eval{% endblock %}
+{% block title %}Upload Evaluation Dataset - Simple Eval{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Upload Dataset</h1>
-            <a href="/datasets" class="btn btn-secondary">Back to Datasets</a>
+            <h1>Upload Evaluation Dataset</h1>
+            <a href="/datasets" class="btn btn-secondary">Back to Evaluation Datasets</a>
         </div>
         <p class="text-muted">Upload a CSV or JSONL file with questions and reference answers</p>
     </div>
@@ -47,7 +47,6 @@
                 <table class="table table-sm">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Question</th>
                             <th>Reference</th>
                         </tr>
@@ -55,7 +54,6 @@
                     <tbody>
                         {% for row in preview_rows %}
                         <tr>
-                            <td>{{ row.id }}</td>
                             <td>{{ row.question[:100] }}{% if row.question|length > 100 %}...{% endif %}</td>
                             <td>{{ row.reference[:100] }}{% if row.reference|length > 100 %}...{% endif %}</td>
                         </tr>
@@ -72,32 +70,32 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5>Dataset Information</h5>
+                <h5>Evaluation Dataset Information</h5>
             </div>
             <div class="card-body">
                 <form method="post" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label for="name" class="form-label">Dataset Name</label>
+                        <label for="name" class="form-label">Evaluation Dataset Name</label>
                         <input type="text" class="form-control" id="name" name="name" 
                                value="{{ name or '' }}" required>
-                        <div class="form-text">A descriptive name for your dataset</div>
+                        <div class="form-text">A descriptive name for your evaluation dataset</div>
                     </div>
                     
                     <div class="mb-3">
                         <label for="description" class="form-label">Description</label>
                         <textarea class="form-control" id="description" name="description" 
                                   rows="3">{{ description or '' }}</textarea>
-                        <div class="form-text">Optional description of the dataset</div>
+                        <div class="form-text">Optional description of the evaluation dataset</div>
                     </div>
                     
                     <div class="mb-3">
-                        <label for="file" class="form-label">Dataset File</label>
+                        <label for="file" class="form-label">Evaluation Dataset File</label>
                         <input type="file" class="form-control" id="file" name="file" 
                                accept=".csv,.jsonl" required>
                         <div class="form-text">CSV or JSONL file with 'question' and 'reference' columns</div>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary">Upload Dataset</button>
+                    <button type="submit" class="btn btn-primary">Upload Evaluation Dataset</button>
                 </form>
             </div>
         </div>

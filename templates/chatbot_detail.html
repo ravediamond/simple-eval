@@ -15,6 +15,22 @@
                 </nav>
                 <h1>{{ agent.name }}</h1>
                 <p class="text-muted">{{ agent.description or "No description" }}</p>
+                
+                <!-- Version Selector -->
+                {% if agent.versions %}
+                <div class="mb-3">
+                    <label for="versionSelector" class="form-label fw-semibold">Chatbot Version:</label>
+                    <select class="form-select" id="versionSelector" onchange="changeVersion()" style="max-width: 300px;">
+                        {% for version in agent.versions %}
+                        <option value="{{ version.id }}" {% if loop.first %}selected{% endif %}>
+                            {{ version.display_name }} 
+                            {% if loop.first %}<span class="text-muted">(Latest)</span>{% endif %}
+                            - {{ version.model_config.provider }}/{{ version.model_config.model }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
             </div>
             <div>
                 <a href="/chatbots/new" class="btn btn-outline-primary">Create New Version</a>
@@ -30,7 +46,7 @@
                     {% if not reference_datasets %}
                     <li><span class="dropdown-item-text text-muted">No datasets uploaded yet</span></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="/chatbots/{{ agent.id }}/datasets/upload">Upload Dataset</a></li>
+                    <li><a class="dropdown-item" href="/chatbots/{{ agent.id }}/datasets/upload">Upload Evaluation Dataset</a></li>
                     {% endif %}
                 </ul>
                 
@@ -143,14 +159,14 @@
     </div>
 </div>
 
-<!-- Datasets for This Chatbot -->
+<!-- Evaluation Datasets for This Chatbot -->
 <div class="row mt-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Datasets</h5>
-                    <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-sm btn-outline-primary">+ Upload New Dataset</a>
+                    <h5 class="mb-0">Evaluation Datasets</h5>
+                    <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-sm btn-outline-primary">+ Upload New Evaluation Dataset</a>
                 </div>
             </div>
             <div class="card-body">
@@ -166,9 +182,14 @@
                                     <strong>Rows:</strong> {{ dataset.row_count }}<br>
                                     <strong>Created:</strong> {{ dataset.created_at.strftime('%Y-%m-%d') }}
                                 </div>
-                                <a href="/chatbots/{{ agent.id }}/datasets/{{ dataset.id }}/run" class="btn btn-sm btn-primary">
-                                    Start Evaluation
-                                </a>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-sm btn-outline-info" onclick="previewDataset({{ dataset.id }}, '{{ dataset.name }}')">
+                                        Preview
+                                    </button>
+                                    <a href="/chatbots/{{ agent.id }}/datasets/{{ dataset.id }}/run" class="btn btn-sm btn-primary">
+                                        Start Evaluation
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -178,7 +199,7 @@
                 <div class="text-center py-4">
                     <p class="text-muted">No reference datasets uploaded for this chatbot version yet.</p>
                     {% if current_version %}
-                        <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-primary">Upload Your First Dataset</a>
+                        <a href="/chatbots/{{ agent.id }}/datasets/upload" class="btn btn-primary">Upload Your First Evaluation Dataset</a>
                     {% else %}
                         <p class="text-muted small">Create a chatbot version first to upload datasets.</p>
                     {% endif %}
@@ -203,7 +224,7 @@
                         <thead>
                             <tr>
                                 <th>Run Name</th>
-                                <th>Dataset</th>
+                                <th>Evaluation Dataset</th>
                                 <th>Status</th>
                                 <th>Overall Score</th>
                                 <th>Pass Rate</th>
@@ -303,6 +324,91 @@ async function deleteChatbot(chatbotId, chatbotName) {
         alert(`Error deleting chatbot: ${error.message}`);
     }
 }
+
+function changeVersion() {
+    const versionSelector = document.getElementById('versionSelector');
+    const selectedVersionId = versionSelector.value;
+    
+    // Get current URL and update it with version parameter
+    const url = new URL(window.location.href);
+    url.searchParams.set('version', selectedVersionId);
+    
+    // Reload the page with the new version
+    window.location.href = url.toString();
+}
+
+async function previewDataset(datasetId, datasetName) {
+    const modal = new bootstrap.Modal(document.getElementById('datasetPreviewModal'));
+    const content = document.getElementById('datasetPreviewContent');
+    const title = document.getElementById('datasetPreviewTitle');
+    
+    title.textContent = `Preview: ${datasetName}`;
+    
+    // Show loading spinner
+    content.innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+    
+    try {
+        const response = await fetch(`/api/datasets/${datasetId}/preview`);
+        const data = await response.json();
+        
+        content.innerHTML = `
+            <div class="mb-3">
+                <strong>Total Rows:</strong> ${data.total_rows} &nbsp;&nbsp;
+                <strong>Created:</strong> ${data.created_at || 'Unknown'}
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Question</th>
+                            <th>Reference Answer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.rows.map(row => `
+                            <tr>
+                                <td>${row.question.length > 200 ? row.question.substring(0, 200) + '...' : row.question}</td>
+                                <td>${row.reference.length > 200 ? row.reference.substring(0, 200) + '...' : row.reference}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            ${data.rows.length < data.total_rows ? `<p class="text-muted">Showing first ${data.rows.length} of ${data.total_rows} rows</p>` : ''}
+        `;
+    } catch (error) {
+        content.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                Error loading dataset preview: ${error.message}
+            </div>
+        `;
+    }
+}
 </script>
+
+<!-- Dataset Preview Modal -->
+<div class="modal fade" id="datasetPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="datasetPreviewTitle">Dataset Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="datasetPreviewContent">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

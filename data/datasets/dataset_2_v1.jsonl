@@ -1,5 +1,5 @@
-{"id": "1", "question": "What is the speed of light?", "reference": "299,792,458 meters per second"}
-{"id": "2", "question": "What is the chemical symbol for gold?", "reference": "Au"}
-{"id": "3", "question": "Who painted the Mona Lisa?", "reference": "Leonardo da Vinci"}
-{"id": "4", "question": "What is the smallest prime number?", "reference": "2"}
-{"id": "5", "question": "In which year was the first iPhone released?", "reference": "2007"}
+{"question": "What is the speed of light?", "reference": "299,792,458 meters per second"}
+{"question": "What is the chemical symbol for gold?", "reference": "Au"}
+{"question": "Who painted the Mona Lisa?", "reference": "Leonardo da Vinci"}
+{"question": "What is the smallest prime number?", "reference": "2"}
+{"question": "In which year was the first iPhone released?", "reference": "2007"}

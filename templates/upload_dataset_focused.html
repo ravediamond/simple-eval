@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Upload Dataset for {{ agent.name }} - Simple Eval{% endblock %}
+{% block title %}Upload Evaluation Dataset for {{ agent.name }} - Simple Eval{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -9,12 +9,12 @@
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="/chatbots">Chatbots</a></li>
                 <li class="breadcrumb-item"><a href="/chatbots/{{ agent.id }}">{{ agent.name }}</a></li>
-                <li class="breadcrumb-item active">Upload Dataset</li>
+                <li class="breadcrumb-item active">Upload Evaluation Dataset</li>
             </ol>
         </nav>
         
-        <h1>Upload Dataset</h1>
-        <p class="text-muted">Upload a dataset for <strong>{{ agent.name }}</strong> to evaluate against</p>
+        <h1>Upload Evaluation Dataset</h1>
+        <p class="text-muted">Upload an evaluation dataset for <strong>{{ agent.name }}</strong> to evaluate against</p>
     </div>
 </div>
 
@@ -52,7 +52,6 @@
                 <table class="table table-sm">
                     <thead>
                         <tr>
-                            <th>ID</th>
                             <th>Question</th>
                             <th>Reference</th>
                             <th>Context</th>
@@ -62,7 +61,6 @@
                     <tbody>
                         {% for row in preview_rows %}
                         <tr>
-                            <td><code>{{ row.id }}</code></td>
                             <td>{{ row.question[:50] }}{% if row.question|length > 50 %}...{% endif %}</td>
                             <td>{{ row.reference[:50] }}{% if row.reference|length > 50 %}...{% endif %}</td>
                             <td>
@@ -87,19 +85,19 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Dataset Information</h5>
+                <h5 class="mb-0">Evaluation Dataset Information</h5>
             </div>
             <div class="card-body">
                 <form method="post" action="/chatbots/{{ agent.id }}/datasets/upload" enctype="multipart/form-data">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="name" class="form-label">Dataset Name *</label>
+                                <label for="name" class="form-label">Evaluation Dataset Name *</label>
                                 <input type="text" class="form-control" id="name" name="name" 
                                        value="{{ name or '' }}" 
                                        placeholder="e.g., Customer Support QA"
                                        required>
-                                <div class="form-text">A descriptive name for this dataset</div>
+                                <div class="form-text">A descriptive name for this evaluation dataset</div>
                             </div>
                         </div>
                         
@@ -109,13 +107,13 @@
                                 <input type="text" class="form-control" id="description" name="description" 
                                        value="{{ description or '' }}" 
                                        placeholder="e.g., Questions about product support and troubleshooting">
-                                <div class="form-text">Optional description of what this dataset tests</div>
+                                <div class="form-text">Optional description of what this evaluation dataset tests</div>
                             </div>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label for="file" class="form-label">Dataset File *</label>
+                        <label for="file" class="form-label">Evaluation Dataset File *</label>
                         <input type="file" class="form-control" id="file" name="file" 
                                accept=".csv,.jsonl" required>
                         <div class="form-text">
@@ -140,7 +138,7 @@
 
                     <div class="d-flex justify-content-between">
                         <a href="/chatbots/{{ agent.id }}" class="btn btn-outline-secondary">← Back to {{ agent.name }}</a>
-                        <button type="submit" class="btn btn-primary">Upload Dataset</button>
+                        <button type="submit" class="btn btn-primary">Upload Evaluation Dataset</button>
                     </div>
                 </form>
             </div>

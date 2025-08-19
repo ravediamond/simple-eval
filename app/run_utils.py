@@ -104,23 +104,34 @@ class AnswersProcessor:
             errors.append("No valid answers found in file")
             return errors
             
-        required_fields = ['id', 'answer']
-        seen_ids = set()
+        # Support both formats: old format (id, answer) and new format (question, answer)
+        seen_questions = set()
         
         for i, answer in enumerate(answers, 1):
-            # Check required fields
-            for field in required_fields:
-                if field not in answer:
-                    errors.append(f"Answer {i}: Missing required field '{field}'")
-                elif not answer[field] or str(answer[field]).strip() == "":
-                    errors.append(f"Answer {i}: Field '{field}' cannot be empty")
-            
-            # Check for duplicate IDs
-            answer_id = answer.get('id')
-            if answer_id:
-                if answer_id in seen_ids:
-                    errors.append(f"Duplicate answer ID found: {answer_id}")
-                seen_ids.add(answer_id)
+            # Check for new format (question, answer)
+            if 'question' in answer and 'answer' in answer:
+                # Validate required fields for new format
+                if not answer['question'] or str(answer['question']).strip() == "":
+                    errors.append(f"Answer {i}: Field 'question' cannot be empty")
+                if not answer['answer'] or str(answer['answer']).strip() == "":
+                    errors.append(f"Answer {i}: Field 'answer' cannot be empty")
+                
+                # Check for duplicate questions
+                question = answer.get('question', '').strip()
+                if question:
+                    if question in seen_questions:
+                        errors.append(f"Duplicate question found: {question}")
+                    seen_questions.add(question)
+                    
+            # Check for old format (id, answer) for backward compatibility
+            elif 'id' in answer and 'answer' in answer:
+                if not answer['id'] or str(answer['id']).strip() == "":
+                    errors.append(f"Answer {i}: Field 'id' cannot be empty")
+                if not answer['answer'] or str(answer['answer']).strip() == "":
+                    errors.append(f"Answer {i}: Field 'answer' cannot be empty")
+            else:
+                # Neither format found
+                errors.append(f"Answer {i}: Must have either ('question', 'answer') or ('id', 'answer') fields")
                 
         return errors
     
@@ -129,17 +140,37 @@ class AnswersProcessor:
         """Validate that answers cover 100% of dataset cases"""
         errors = []
         
-        answer_ids = {str(answer.get('id', '')) for answer in answers}
-        dataset_ids = {str(row.get('id', '')) for row in dataset_rows}
-        
-        missing_ids = dataset_ids - answer_ids
-        extra_ids = answer_ids - dataset_ids
-        
-        if missing_ids:
-            errors.append(f"Missing answers for dataset IDs: {', '.join(sorted(missing_ids))}")
+        # Support both old format (id-based) and new format (question-based)
+        if answers and 'question' in answers[0]:
+            # New format: validate by question
+            answer_questions = {answer.get('question', '').strip() for answer in answers}
+            dataset_questions = {row.get('question', '').strip() for row in dataset_rows}
             
-        if extra_ids:
-            errors.append(f"Extra answer IDs not in dataset: {', '.join(sorted(extra_ids))}")
+            missing_questions = dataset_questions - answer_questions
+            extra_questions = answer_questions - dataset_questions
+            
+            if missing_questions:
+                errors.append(f"Missing answers for questions: {', '.join(sorted(list(missing_questions)[:3]))}")
+                if len(missing_questions) > 3:
+                    errors.append(f"...and {len(missing_questions) - 3} more questions")
+                
+            if extra_questions:
+                errors.append(f"Extra answer questions not in dataset: {', '.join(sorted(list(extra_questions)[:3]))}")
+                if len(extra_questions) > 3:
+                    errors.append(f"...and {len(extra_questions) - 3} more questions")
+        else:
+            # Old format: validate by ID
+            answer_ids = {str(answer.get('id', '')) for answer in answers}
+            dataset_ids = {str(row.get('id', '')) for row in dataset_rows}
+            
+            missing_ids = dataset_ids - answer_ids
+            extra_ids = answer_ids - dataset_ids
+            
+            if missing_ids:
+                errors.append(f"Missing answers for dataset IDs: {', '.join(sorted(missing_ids))}")
+                
+            if extra_ids:
+                errors.append(f"Extra answer IDs not in dataset: {', '.join(sorted(extra_ids))}")
             
         return errors
 
@@ -165,21 +196,45 @@ class RunProcessor:
                 self.db.commit()
                 
                 # Create test cases from dataset and answers
-                answer_map = {str(answer['id']): answer['answer'] for answer in answers}
-                
-                for dataset_row in dataset_rows:
-                    case_id = str(dataset_row['id'])
-                    actual_answer = answer_map[case_id]
+                # Support both old format (id-based) and new format (question-based)
+                if answers and 'question' in answers[0]:
+                    # New format: match by question
+                    answer_map = {answer['question']: answer['answer'] for answer in answers}
                     
-                    test_case = TestCase(
-                        run_id=run.id,
-                        case_id=case_id,
-                        question=dataset_row.get('question', ''),
-                        context=dataset_row.get('context'),
-                        expected_answer=dataset_row.get('expected_answer'),
-                        actual_answer=actual_answer
-                    )
-                    self.db.add(test_case)
+                    for i, dataset_row in enumerate(dataset_rows):
+                        question = dataset_row['question']
+                        case_id = f"q{i+1}"  # Generate case ID
+                        actual_answer = answer_map.get(question, "")
+                        
+                        if not actual_answer:
+                            raise ValueError(f"No answer found for question: {question}")
+                        
+                        test_case = TestCase(
+                            run_id=run.id,
+                            case_id=case_id,
+                            question=dataset_row.get('question', ''),
+                            context=dataset_row.get('context'),
+                            expected_answer=dataset_row.get('reference', ''),  # Use 'reference' field
+                            actual_answer=actual_answer
+                        )
+                        self.db.add(test_case)
+                else:
+                    # Old format: match by ID
+                    answer_map = {str(answer['id']): answer['answer'] for answer in answers}
+                    
+                    for dataset_row in dataset_rows:
+                        case_id = str(dataset_row['id'])
+                        actual_answer = answer_map[case_id]
+                        
+                        test_case = TestCase(
+                            run_id=run.id,
+                            case_id=case_id,
+                            question=dataset_row.get('question', ''),
+                            context=dataset_row.get('context'),
+                            expected_answer=dataset_row.get('expected_answer', ''),
+                            actual_answer=actual_answer
+                        )
+                        self.db.add(test_case)
                 
                 self.db.commit()
                 

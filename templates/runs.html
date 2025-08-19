@@ -24,7 +24,7 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>Agent</th>
-                                    <th>Dataset</th>
+                                    <th>Evaluation Dataset</th>
                                     <th>Status</th>
                                     <th>Progress</th>
                                     <th>Overall Score</th>
@@ -52,7 +52,7 @@
                                             {{ run.dataset_version.dataset.name }}
                                             <small class="text-muted">({{ run.dataset_version.display_name }})</small>
                                         {% else %}
-                                            <span class="text-muted">No dataset</span>
+                                            <span class="text-muted">No evaluation dataset</span>
                                         {% endif %}
                                     </td>
                                     <td>

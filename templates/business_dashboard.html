@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}🤖 {{ experiment.name }} - Business Dashboard{% endblock %}
+{% block title %}🤖 {{ experiment.name }} - Overview{% endblock %}
 
 {% block content %}
 <!-- Bot Health Header -->
@@ -11,6 +11,19 @@
                 <div class="me-4">
                     <h1 class="mb-1 fw-bold">🤖 {{ experiment.name }}</h1>
                     <p class="mb-0 opacity-75">Customer Support Bot</p>
+                    
+                    <!-- Version Selector -->
+                    {% if experiment.versions %}
+                    <div class="mt-2">
+                        <select class="form-select form-select-sm text-dark" id="versionSelector" onchange="changeVersion()" style="max-width: 250px; background-color: rgba(255,255,255,0.9);">
+                            {% for version in experiment.versions %}
+                            <option value="{{ version.id }}" {% if version.id == current_version.id %}selected{% endif %}>
+                                {{ version.display_name }}{% if loop.first %} (Latest){% endif %} - {{ version.model_config.provider }}/{{ version.model_config.model }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
                 </div>
                 {% set latest_run = runs|selectattr('status', 'equalto', 'completed')|list|first %}
                 {% if latest_run and latest_run.overall_score %}
@@ -27,7 +40,7 @@
                 {% endif %}
             </div>
             <div class="text-end">
-                <a href="/chatbots/{{ experiment.id }}/technical" class="btn btn-light btn-sm opacity-75 me-2">Technical View</a>
+                <a href="/chatbots/{{ experiment.id }}/detailed" class="btn btn-light btn-sm opacity-75 me-2">Detailed View</a>
                 <a href="/chatbots" class="btn btn-light btn-sm opacity-75">Switch Bot</a>
             </div>
         </div>
@@ -446,5 +459,17 @@ document.addEventListener('DOMContentLoaded', function() {
         name: '{{ experiment.name }}'
     }));
 });
+
+function changeVersion() {
+    const versionSelector = document.getElementById('versionSelector');
+    const selectedVersionId = versionSelector.value;
+    
+    // Get current URL and update it with version parameter
+    const url = new URL(window.location.href);
+    url.searchParams.set('version', selectedVersionId);
+    
+    // Reload the page with the new version
+    window.location.href = url.toString();
+}
 </script>
 {% endblock %}
