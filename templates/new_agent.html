@@ -89,22 +89,9 @@
                                 <div class="accordion-body">
                                     <div class="alert alert-info" role="alert">
                                         <i class="bi bi-info-circle"></i>
-                                        <strong>Evaluation:</strong> LLM-as-Judge evaluation is enabled by default. This uses the selected judge configuration to evaluate chatbot responses.
+                                        <strong>Evaluation:</strong> LLM-as-Judge evaluation is enabled by default. The selected judge configuration above determines the evaluation criteria and prompt. Create custom judge configurations in the <a href="/judges" class="alert-link">Judge Configurations</a> page to use different evaluation profiles (Simple, Detailed, or Custom).
                                     </div>
                                     
-                                    <div class="mb-3">
-                                        <label for="judge_prompt" class="form-label">Custom Judge Prompt</label>
-                                        <textarea class="form-control" id="judge_prompt" name="judge_prompt" rows="4" placeholder="Leave blank to use default judge prompt from LLM configurations">You are an expert evaluator assessing the quality and correctness of AI responses.
-
-Please evaluate the given response to the question on the following criteria:
-1. Accuracy: Is the response factually correct?
-2. Completeness: Does it fully answer the question?
-3. Clarity: Is it well-written and understandable?
-4. Relevance: Does it directly address what was asked?
-
-Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning.</textarea>
-                                        <div class="form-text">Custom prompt for evaluation. Leave blank to use system default.</div>
-                                    </div>
                                     
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="store_verbose_artifacts" name="store_verbose_artifacts">

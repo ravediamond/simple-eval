@@ -75,6 +75,9 @@ class JudgeConfiguration(Base):
     # Base LLM Configuration reference
     base_llm_config_id = Column(Integer, ForeignKey("llm_configurations.id"), nullable=False)
     
+    # Judge profile: simple, detailed, custom
+    judge_profile = Column(String, nullable=False, default="simple")
+    
     # Judge-specific settings
     judge_prompt = Column(Text, nullable=False)
     llm_as_judge_threshold = Column(Float, default=0.8)
@@ -175,6 +178,7 @@ class Agent(Base):
     name = Column(String, nullable=False)
     description = Column(Text)
     tags = Column(JSON)  # List of strings
+    is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

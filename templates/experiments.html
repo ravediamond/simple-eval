@@ -16,7 +16,14 @@
                 <div class="col-md-6 col-lg-4 mb-4">
                     <div class="card h-100 chatbot-card" onclick="selectChatbot({{ chatbot.id }}, '{{ chatbot.name }}')">
                         <div class="card-body">
-                            <h5 class="card-title">{{ chatbot.name }}</h5>
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h5 class="card-title mb-0">{{ chatbot.name }}</h5>
+                                <button class="btn btn-sm btn-outline-danger" 
+                                        onclick="event.stopPropagation(); deleteChatbot({{ chatbot.id }}, '{{ chatbot.name }}')"
+                                        title="Delete chatbot">
+                                    🗑️
+                                </button>
+                            </div>
                             <p class="card-text text-muted">{{ chatbot.description or "No description" }}</p>
                             
                             {% if chatbot.tags %}
@@ -89,6 +96,33 @@
 </style>
 
 <script>
+async function deleteChatbot(chatbotId, chatbotName) {
+    if (!confirm(`Are you sure you want to delete the chatbot "${chatbotName}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/chatbots/${chatbotId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            // Reload the page to update the list
+            window.location.reload();
+        } else {
+            alert(`Error: ${result.message}`);
+        }
+    } catch (error) {
+        alert(`Error deleting chatbot: ${error.message}`);
+    }
+}
+
 function selectChatbot(chatbotId, chatbotName) {
     // Store selected chatbot in localStorage (like MLflow)
     localStorage.setItem('selectedChatbot', JSON.stringify({

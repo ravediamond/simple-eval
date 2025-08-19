@@ -125,6 +125,16 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="judge_profile" class="form-label">Judge Profile *</label>
+                        <select class="form-select" id="judge_profile" name="judge_profile" required onchange="updateJudgePrompt()">
+                            <option value="simple">Simple - Only check if answer is correct</option>
+                            <option value="detailed">Detailed - Check correctness, completeness, no extra facts, answer type match</option>
+                            <option value="custom">Custom - Use your own prompt</option>
+                        </select>
+                        <div class="form-text">Choose how strictly the judge should evaluate responses</div>
+                    </div>
+
+                    <div class="mb-3">
                         <label for="judge_prompt" class="form-label">Judge Prompt *</label>
                         <textarea class="form-control" id="judge_prompt" name="judge_prompt" rows="6" required placeholder="Enter the prompt for LLM-as-Judge evaluation...">You are an expert evaluator assessing the quality and correctness of AI responses.
 
@@ -255,6 +265,7 @@ async function editJudge(judgeId) {
             document.getElementById('name').value = judge.name;
             document.getElementById('description').value = judge.description;
             document.getElementById('base_llm_config_id').value = judge.base_llm_config_id;
+            document.getElementById('judge_profile').value = judge.judge_profile || 'simple';
             document.getElementById('judge_prompt').value = judge.judge_prompt;
             document.getElementById('llm_as_judge_threshold').value = judge.llm_as_judge_threshold;
             document.getElementById('is_default_judge').checked = judge.is_default_judge;
@@ -295,6 +306,75 @@ async function deleteJudge(judgeId, judgeName) {
         }
     } catch (error) {
         showAlert(`Error deleting judge configuration: ${error.message}`, 'danger');
+    }
+}
+
+// Update judge prompt based on selected profile
+function updateJudgePrompt() {
+    const profile = document.getElementById('judge_profile').value;
+    const promptTextarea = document.getElementById('judge_prompt');
+    
+    if (profile === 'simple') {
+        promptTextarea.value = `You are an expert evaluator. Your task is to determine if the AI response correctly answers the question.
+
+Question: {question}
+{expected_section}
+Response to evaluate: {actual_answer}
+
+Evaluate ONLY if the response is correct. Respond with:
+- PASS if the answer is correct
+- FAIL if the answer is incorrect
+
+Format your response as:
+Result: [PASS/FAIL]
+Explanation:
+• [Bullet point explaining why it passes or fails]
+• [Additional bullet points as needed]`;
+    } else if (profile === 'detailed') {
+        promptTextarea.value = `You are an expert evaluator. Evaluate the AI response against the expected answer with these strict criteria:
+
+1. CORRECTNESS: The answer must be factually correct
+2. COMPLETENESS: All facts from the expected answer must be present
+3. NO EXTRA FACTS: The response should not contain facts not in the expected answer
+4. ANSWER TYPE MATCH: The response style must match (detailed vs concise)
+
+Question: {question}
+{expected_section}
+Response to evaluate: {actual_answer}
+
+The response must meet ALL criteria to pass. Respond with:
+- PASS if ALL criteria are met
+- FAIL if ANY criteria fails
+
+Format your response as:
+Result: [PASS/FAIL]
+Explanation:
+• Correctness: [Pass/Fail - explain]
+• Completeness: [Pass/Fail - explain] 
+• No extra facts: [Pass/Fail - explain]
+• Answer type match: [Pass/Fail - explain]`;
+    } else if (profile === 'custom') {
+        promptTextarea.value = `You are an expert evaluator assessing the quality and correctness of AI responses.
+
+Please evaluate the given response to the question on the following criteria:
+1. Accuracy: Is the response factually correct?
+2. Completeness: Does it fully answer the question?
+3. Clarity: Is it well-written and understandable?
+4. Relevance: Does it directly address what was asked?
+
+Question: {question}
+{expected_section}
+Response to evaluate: {actual_answer}
+
+Respond with:
+- PASS if the response meets the criteria
+- FAIL if the response does not meet the criteria
+
+Format your response as:
+Result: [PASS/FAIL]
+Explanation:
+• [Bullet point explaining your evaluation]
+• [Additional bullet points as needed]`;
     }
 }
 
@@ -341,16 +421,9 @@ document.getElementById('judgeModal').addEventListener('hidden.bs.modal', functi
     document.getElementById('judgeForm').reset();
     document.getElementById('judgeModalTitle').textContent = 'New Judge Configuration';
     document.getElementById('saveJudgeBtn').textContent = 'Save Judge Configuration';
-    // Reset default text
-    document.getElementById('judge_prompt').value = `You are an expert evaluator assessing the quality and correctness of AI responses.
-
-Please evaluate the given response to the question on the following criteria:
-1. Accuracy: Is the response factually correct?
-2. Completeness: Does it fully answer the question?
-3. Clarity: Is it well-written and understandable?
-4. Relevance: Does it directly address what was asked?
-
-Provide a score from 0 to 1 (where 1 is excellent and 0 is poor) and explain your reasoning.`;
+    // Reset to simple profile and update prompt
+    document.getElementById('judge_profile').value = 'simple';
+    updateJudgePrompt();
 });
 </script>
 

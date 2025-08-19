@@ -7,7 +7,7 @@ import asyncio
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from app.models import Run, TestCase, MetricResult, AgentVersion, DatasetVersion, LLMConfiguration
+from app.models import Run, TestCase, MetricResult, AgentVersion, DatasetVersion, LLMConfiguration, JudgeConfiguration
 from app.connectors import ConnectorFactory, ConnectorConfig, ConnectorManager
 from app.evaluation_engine import EvaluationEngine
 
@@ -296,30 +296,44 @@ class RunProcessor:
     async def _process_test_case(self, test_case: TestCase, agent_version: AgentVersion) -> None:
         """Process a single test case with enabled metrics using real evaluation engine"""
         
-        # Try to get default judge configuration from database first
-        default_judge_config = self.db.query(LLMConfiguration).filter(
-            LLMConfiguration.is_default_judge == True,
-            LLMConfiguration.is_active == True
-        ).first()
+        # Get judge configuration from agent version if available
+        judge_config_obj = None
+        if agent_version.judge_config_id:
+            judge_config_obj = self.db.query(JudgeConfiguration).filter(
+                JudgeConfiguration.id == agent_version.judge_config_id,
+                JudgeConfiguration.is_active == True
+            ).first()
         
-        if default_judge_config:
-            # Use saved LLM configuration as judge
-            judge_config = default_judge_config.to_connector_config()
-            # Override judge prompt if agent has custom prompt
-            custom_prompt = agent_version.judge_prompt or default_judge_config.default_judge_prompt
-            llm_as_judge_threshold = default_judge_config.llm_as_judge_threshold
-            faithfulness_threshold = default_judge_config.faithfulness_threshold
+        if judge_config_obj:
+            # Use the judge configuration
+            judge_config = judge_config_obj.to_connector_config()
+            custom_prompt = agent_version.judge_prompt or judge_config_obj.judge_prompt
+            llm_as_judge_threshold = judge_config_obj.llm_as_judge_threshold
+            judge_profile = judge_config_obj.judge_profile
         else:
-            # Fallback to agent version judge config
-            judge_config = ConnectorConfig(**agent_version.judge_model_config)
-            custom_prompt = agent_version.judge_prompt
-            llm_as_judge_threshold = agent_version.default_thresholds.get('llm_as_judge', 0.8)
-            faithfulness_threshold = agent_version.default_thresholds.get('faithfulness', 0.8)
+            # Try to get default judge configuration from database
+            default_judge_config = self.db.query(LLMConfiguration).filter(
+                LLMConfiguration.is_default_judge == True,
+                LLMConfiguration.is_active == True
+            ).first()
+            
+            if default_judge_config:
+                # Use saved LLM configuration as judge
+                judge_config = default_judge_config.to_connector_config()
+                custom_prompt = agent_version.judge_prompt or getattr(default_judge_config, 'default_judge_prompt', None)
+                llm_as_judge_threshold = getattr(default_judge_config, 'llm_as_judge_threshold', 0.8)
+                judge_profile = "simple"  # Default profile for legacy configs
+            else:
+                # Fallback to agent version judge config
+                judge_config = ConnectorConfig(**agent_version.judge_model_config)
+                custom_prompt = agent_version.judge_prompt
+                llm_as_judge_threshold = agent_version.default_thresholds.get('llm_as_judge', 0.8)
+                judge_profile = "simple"  # Default profile for legacy configs
         
         evaluation_engine = EvaluationEngine(judge_config)
         
         try:
-            # Evaluate test case with LLM-as-judge only
+            # Evaluate test case with LLM-as-judge using the specified profile
             metric_results = await evaluation_engine.evaluate_test_case(
                 question=test_case.question,
                 actual_answer=test_case.actual_answer,
@@ -327,6 +341,7 @@ class RunProcessor:
                 context=test_case.context,
                 llm_as_judge_threshold=llm_as_judge_threshold,
                 custom_judge_prompt=custom_prompt,
+                judge_profile=judge_profile,
                 store_verbose_artifacts=agent_version.store_verbose_artifacts or False
             )
             

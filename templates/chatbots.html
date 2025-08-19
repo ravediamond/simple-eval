@@ -23,9 +23,16 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
                                 <h5 class="card-title mb-0">{{ agent.name }}</h5>
-                                {% if agent.versions %}
-                                    <span class="badge bg-info">{{ agent.versions[0].display_name }}</span>
-                                {% endif %}
+                                <div class="d-flex align-items-center gap-2">
+                                    {% if agent.versions %}
+                                        <span class="badge bg-info">{{ agent.versions[0].display_name }}</span>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="event.stopPropagation(); deleteChatbot({{ agent.id }}, '{{ agent.name }}')"
+                                            title="Delete chatbot">
+                                        🗑️
+                                    </button>
+                                </div>
                             </div>
                             
                             <p class="card-text text-muted">
@@ -87,4 +94,34 @@
     transform: translateY(0);
 }
 </style>
+
+<script>
+async function deleteChatbot(chatbotId, chatbotName) {
+    if (!confirm(`Are you sure you want to delete the chatbot "${chatbotName}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/chatbots/${chatbotId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            // Reload the page to update the list
+            window.location.reload();
+        } else {
+            alert(`Error: ${result.message}`);
+        }
+    } catch (error) {
+        alert(`Error deleting chatbot: ${error.message}`);
+    }
+}
+</script>
+
 {% endblock %}

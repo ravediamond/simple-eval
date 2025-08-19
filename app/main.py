@@ -38,7 +38,7 @@ async def health_check():
 @app.get("/api/chatbots")
 async def get_chatbots_list(db: Session = Depends(get_db)):
     """Get chatbots list for sidebar"""
-    chatbots = db.query(Agent).all()
+    chatbots = db.query(Agent).filter(Agent.is_active == True).all()
     return [
         {
             "id": bot.id,
@@ -64,7 +64,7 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 @app.get("/chatbots", response_class=HTMLResponse)
 async def chatbots_page(request: Request, db: Session = Depends(get_db)):
     """Chatbots page - main entry point (like MLflow)"""
-    agents = db.query(Agent).all()
+    agents = db.query(Agent).filter(Agent.is_active == True).all()
     return templates.TemplateResponse("experiments.html", {
         "request": request,
         "experiments": agents  # Template still uses experiments variable
@@ -119,7 +119,7 @@ async def judges_page(request: Request, db: Session = Depends(get_db)):
 @app.get("/chatbots/{chatbot_id}/datasets/upload", response_class=HTMLResponse)
 async def upload_dataset_for_chatbot(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
     """Upload reference dataset form for specific chatbot"""
-    chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    chatbot = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
@@ -156,7 +156,7 @@ async def upload_reference_dataset_for_chatbot(
 ):
     """Upload reference dataset for specific chatbot"""
     # Get chatbot and current version
-    chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    chatbot = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
@@ -543,7 +543,7 @@ async def create_agent_legacy(
 @app.get("/chatbots/{chatbot_id}", response_class=HTMLResponse)
 async def chatbot_dashboard(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
     """Chatbot dashboard - Business-friendly view"""
-    chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    chatbot = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
@@ -567,7 +567,7 @@ async def chatbot_dashboard(request: Request, chatbot_id: int, db: Session = Dep
 @app.get("/chatbots/{chatbot_id}/technical", response_class=HTMLResponse)
 async def chatbot_technical_dashboard(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
     """Chatbot technical dashboard - MLflow-style detailed view"""
-    chatbot = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    chatbot = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
     if not chatbot:
         raise HTTPException(status_code=404, detail="Chatbot not found")
     
@@ -1329,6 +1329,7 @@ async def create_judge_config(
     name: str = Form(...),
     description: str = Form(""),
     base_llm_config_id: int = Form(...),
+    judge_profile: str = Form("simple"),
     judge_prompt: str = Form(...),
     llm_as_judge_threshold: float = Form(0.8),
     is_default_judge: bool = Form(False),
@@ -1385,6 +1386,7 @@ async def create_judge_config(
             name=name,
             description=description,
             base_llm_config_id=base_llm_config_id,
+            judge_profile=judge_profile,
             judge_prompt=judge_prompt,
             llm_as_judge_threshold=llm_as_judge_threshold,
             is_default_judge=is_default_judge,
@@ -1460,6 +1462,7 @@ async def update_judge_config(
     name: str = Form(...),
     description: str = Form(""),
     base_llm_config_id: int = Form(...),
+    judge_profile: str = Form("simple"),
     judge_prompt: str = Form(...),
     llm_as_judge_threshold: float = Form(0.8),
     is_default_judge: bool = Form(False),
@@ -1525,6 +1528,7 @@ async def update_judge_config(
         judge.name = name
         judge.description = description
         judge.base_llm_config_id = base_llm_config_id
+        judge.judge_profile = judge_profile
         judge.judge_prompt = judge_prompt
         judge.llm_as_judge_threshold = llm_as_judge_threshold
         judge.is_default_judge = is_default_judge
@@ -1591,6 +1595,7 @@ async def get_judge_config(judge_id: int, db: Session = Depends(get_db)):
             "name": judge.name,
             "description": judge.description,
             "base_llm_config_id": judge.base_llm_config_id,
+            "judge_profile": judge.judge_profile,
             "judge_prompt": judge.judge_prompt,
             "llm_as_judge_threshold": judge.llm_as_judge_threshold,
             "is_default_judge": judge.is_default_judge,
@@ -1641,7 +1646,7 @@ async def upload_dataset_api(
     from app.dataset_utils import DatasetProcessor
     
     # Get chatbot
-    agent = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    agent = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
     if not agent:
         return JSONResponse({
             "success": False,
@@ -1715,7 +1720,7 @@ async def create_run_api(
     
     try:
         # Validate chatbot and dataset
-        agent = db.query(Agent).filter(Agent.id == chatbot_id).first()
+        agent = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
         if not agent:
             return JSONResponse({
                 "success": False,
@@ -1839,7 +1844,7 @@ async def get_run_api(run_id: int, db: Session = Depends(get_db)):
 @app.get("/api/chatbots/{chatbot_id}")
 async def get_chatbot_api(chatbot_id: int, db: Session = Depends(get_db)):
     """API endpoint to get chatbot details"""
-    agent = db.query(Agent).filter(Agent.id == chatbot_id).first()
+    agent = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
     if not agent:
         return JSONResponse({
             "success": False,
@@ -1859,9 +1864,10 @@ async def get_chatbot_api(chatbot_id: int, db: Session = Depends(get_db)):
                 "id": latest_version.id,
                 "version_number": latest_version.version_number,
                 "model_config": latest_version.model_config,
-                "llm_as_judge_enabled": latest_version.llm_as_judge_enabled,
-                "faithfulness_enabled": latest_version.faithfulness_enabled,
-                "judge_prompt": latest_version.judge_prompt
+                "llm_config_id": latest_version.llm_config_id,
+                "judge_config_id": latest_version.judge_config_id,
+                "judge_prompt": latest_version.judge_prompt,
+                "default_thresholds": latest_version.default_thresholds
             } if latest_version else None,
             "datasets": [
                 {
@@ -1886,3 +1892,31 @@ async def get_chatbot_api(chatbot_id: int, db: Session = Depends(get_db)):
             ]
         }
     })
+
+@app.delete("/api/chatbots/{chatbot_id}")
+async def delete_chatbot(chatbot_id: int, db: Session = Depends(get_db)):
+    """Delete chatbot (soft delete)"""
+    agent = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
+    if not agent:
+        return JSONResponse({
+            "success": False,
+            "message": "Chatbot not found"
+        }, status_code=404)
+    
+    try:
+        # Soft delete the agent
+        agent.is_active = False
+        agent.updated_at = datetime.utcnow()
+        db.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": f"Chatbot '{agent.name}' deleted successfully"
+        })
+        
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({
+            "success": False,
+            "message": f"Error deleting chatbot: {str(e)}"
+        }, status_code=500)

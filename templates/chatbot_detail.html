@@ -33,6 +33,16 @@
                     <li><a class="dropdown-item" href="/chatbots/{{ agent.id }}/datasets/upload">Upload Dataset</a></li>
                     {% endif %}
                 </ul>
+                
+                <!-- Advanced Menu -->
+                <button class="btn btn-outline-secondary dropdown-toggle ms-2" type="button" data-bs-toggle="dropdown">
+                    ⚙️ Advanced
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="deleteChatbot({{ agent.id }}, '{{ agent.name }}')">
+                        <i class="text-danger">🗑️</i> Delete Chatbot
+                    </a></li>
+                </ul>
             </div>
         </div>
     </div>
@@ -265,4 +275,34 @@
         </div>
     </div>
 </div>
+
+<script>
+async function deleteChatbot(chatbotId, chatbotName) {
+    if (!confirm(`Are you sure you want to delete the chatbot "${chatbotName}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/chatbots/${chatbotId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(result.message);
+            // Redirect to chatbots list
+            window.location.href = '/chatbots';
+        } else {
+            alert(`Error: ${result.message}`);
+        }
+    } catch (error) {
+        alert(`Error deleting chatbot: ${error.message}`);
+    }
+}
+</script>
+
 {% endblock %}
