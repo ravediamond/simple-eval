@@ -17,7 +17,7 @@ from app.connectors import ConnectorFactory, ConnectorConfig
 
 load_dotenv()
 
-app = FastAPI(title="Simple Eval", description="Lightweight chatbot evaluation platform")
+app = FastAPI(title="EvalNow", description="Lightweight chatbot evaluation platform")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -33,7 +33,7 @@ async def startup_event():
 @app.get("/healthz")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "ok", "service": "simple-eval"}
+    return {"status": "ok", "service": "evalnow"}
 
 @app.get("/api/chatbots")
 async def get_chatbots_list(db: Session = Depends(get_db)):

@@ -1,4 +1,4 @@
-# Simple Eval
+# EvalNow
 
 A lightweight local web app to evaluate chatbot "agents" against verified datasets.
 
@@ -167,7 +167,7 @@ Upload an Answers file with `id`, `answer` for the chosen DatasetVersion. No con
 ### Configuration
 Create a `.env` file in the project root:
 ```
-DATABASE_URL=sqlite:///./data/simple_eval.db
+DATABASE_URL=sqlite:///./data/evalnow.db
 DEBUG=true
 HOST=127.0.0.1
 PORT=8000
