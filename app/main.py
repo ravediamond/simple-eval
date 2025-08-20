@@ -65,7 +65,24 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 async def chatbots_page(request: Request, db: Session = Depends(get_db)):
     """Chatbots page - main entry point (like MLflow)"""
     agents = db.query(Agent).filter(Agent.is_active == True).all()
-    return templates.TemplateResponse("experiments.html", {
+    
+    # Add latest evaluation status for each agent
+    for agent in agents:
+        agent.latest_evaluation_status = None
+        agent.latest_evaluation_score = None
+        if agent.versions:
+            # Get the most recent run across all versions
+            latest_run = None
+            for version in agent.versions:
+                for run in version.runs:
+                    if latest_run is None or run.created_at > latest_run.created_at:
+                        latest_run = run
+            
+            if latest_run:
+                agent.latest_evaluation_status = latest_run.status
+                agent.latest_evaluation_score = latest_run.overall_score
+    
+    return templates.TemplateResponse("chatbots_list.html", {
         "request": request,
         "experiments": agents  # Template still uses experiments variable
     })
@@ -77,13 +94,9 @@ async def experiments_redirect(request: Request):
 
 
 @app.get("/agents", response_class=HTMLResponse)
-async def agents(request: Request, db: Session = Depends(get_db)):
+async def agents_redirect(request: Request):
     """Legacy redirect to chatbots"""
-    agents = db.query(Agent).all()
-    return templates.TemplateResponse("chatbots.html", {
-        "request": request,
-        "agents": agents
-    })
+    return RedirectResponse(url="/chatbots", status_code=302)
 
 @app.get("/datasets", response_class=HTMLResponse)
 async def datasets(request: Request, db: Session = Depends(get_db)):
@@ -578,28 +591,9 @@ async def chatbot_overview(request: Request, chatbot_id: int, version: int = Non
     })
 
 @app.get("/chatbots/{chatbot_id}/detailed", response_class=HTMLResponse)
-async def chatbot_detailed(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
-    """Chatbot detailed view - In-depth technical information"""
-    chatbot = db.query(Agent).filter(Agent.id == chatbot_id, Agent.is_active == True).first()
-    if not chatbot:
-        raise HTTPException(status_code=404, detail="Chatbot not found")
-    
-    # Get current version (latest) and its reference datasets
-    current_version = chatbot.versions[0] if chatbot.versions else None
-    reference_datasets = []
-    if current_version:
-        reference_datasets = current_version.reference_datasets
-    
-    # Get runs for this chatbot
-    runs = db.query(Run).join(AgentVersion).filter(AgentVersion.agent_id == chatbot_id).order_by(Run.created_at.desc()).all()
-    
-    return templates.TemplateResponse("evaluation_dashboard.html", {
-        "request": request,
-        "experiment": chatbot,  # Template still uses experiment variable
-        "current_version": current_version,
-        "reference_datasets": reference_datasets,
-        "runs": runs
-    })
+async def chatbot_detailed_redirect(request: Request, chatbot_id: int, db: Session = Depends(get_db)):
+    """Legacy redirect from detailed to main chatbot view"""
+    return RedirectResponse(url=f"/chatbots/{chatbot_id}", status_code=302)
 
 @app.get("/experiments/{experiment_id}", response_class=HTMLResponse)
 async def experiment_redirect(request: Request, experiment_id: int, db: Session = Depends(get_db)):
@@ -616,13 +610,29 @@ async def agent_detail(request: Request, agent_id: int, db: Session = Depends(ge
     """Legacy agent detail - redirect to chatbot detail"""
     return RedirectResponse(url=f"/chatbots/{agent_id}", status_code=302)
 
+# Legacy redirects for runs -> evaluations
+@app.get("/runs", response_class=HTMLResponse)
+async def runs_redirect(request: Request):
+    """Legacy redirect from runs to evaluations"""
+    return RedirectResponse(url="/evaluations", status_code=302)
+
+@app.get("/runs/new", response_class=HTMLResponse)
+async def new_run_redirect(request: Request):
+    """Legacy redirect from runs/new to evaluations/new"""
+    return RedirectResponse(url="/evaluations/new", status_code=302)
+
+@app.get("/runs/{run_id}", response_class=HTMLResponse)
+async def run_detail_redirect(request: Request, run_id: int):
+    """Legacy redirect from runs/{id} to evaluations/{id}"""
+    return RedirectResponse(url=f"/evaluations/{run_id}", status_code=302)
+
 # Connector test endpoint removed - CSV upload only
 
-@app.get("/runs", response_class=HTMLResponse)
-async def runs(request: Request, db: Session = Depends(get_db)):
-    """Runs page"""
+@app.get("/evaluations", response_class=HTMLResponse)
+async def evaluations(request: Request, db: Session = Depends(get_db)):
+    """Evaluations page"""
     runs = db.query(Run).order_by(Run.created_at.desc()).all()
-    return templates.TemplateResponse("runs.html", {
+    return templates.TemplateResponse("evaluations.html", {
         "request": request,
         "runs": runs
     })
@@ -647,9 +657,9 @@ async def new_run_for_chatbot_dataset(request: Request, agent_id: int, reference
         "agent_version": reference_dataset.agent_version
     })
 
-@app.get("/runs/new", response_class=HTMLResponse)
-async def new_run_form(request: Request, db: Session = Depends(get_db)):
-    """New run wizard - step 1"""
+@app.get("/evaluations/new", response_class=HTMLResponse)
+async def new_evaluation_form(request: Request, db: Session = Depends(get_db)):
+    """New evaluation wizard - step 1"""
     agents = db.query(Agent).all()
     datasets = db.query(Dataset).all()
     return templates.TemplateResponse("new_run.html", {
@@ -813,8 +823,8 @@ async def upload_run_answers(
             "datasets": datasets
         })
 
-@app.get("/runs/{run_id}", response_class=HTMLResponse)
-async def run_detail(
+@app.get("/evaluations/{run_id}", response_class=HTMLResponse)
+async def evaluation_detail(
     request: Request, 
     run_id: int, 
     db: Session = Depends(get_db),
@@ -850,7 +860,7 @@ async def run_detail(
     passed_cases = sum(1 for tc in all_test_cases if tc.passed)
     failed_cases = total_cases - passed_cases
     
-    return templates.TemplateResponse("run_detail.html", {
+    return templates.TemplateResponse("evaluation_detail.html", {
         "request": request,
         "run": run,
         "test_cases": filtered_test_cases,
@@ -861,7 +871,7 @@ async def run_detail(
         "current_filters": filters
     })
 
-@app.get("/api/runs/{run_id}/status")
+@app.get("/api/evaluations/{run_id}/status")
 async def get_run_status(run_id: int, db: Session = Depends(get_db)):
     """Get current run status (for progress polling)"""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -875,7 +885,7 @@ async def get_run_status(run_id: int, db: Session = Depends(get_db)):
         "progress": (run.completed_test_cases / run.total_test_cases * 100) if run.total_test_cases > 0 else 0
     }
 
-@app.get("/runs/{run_id}/export/csv")
+@app.get("/evaluations/{run_id}/export/csv")
 async def export_run_csv(run_id: int, db: Session = Depends(get_db)):
     """Export run results as CSV"""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -902,7 +912,7 @@ async def export_run_csv(run_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
-@app.get("/runs/{run_id}/export/json")
+@app.get("/evaluations/{run_id}/export/json")
 async def export_run_json(run_id: int, db: Session = Depends(get_db)):
     """Export run results as JSON"""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -929,7 +939,7 @@ async def export_run_json(run_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
-@app.get("/runs/{run_id}/export/html")
+@app.get("/evaluations/{run_id}/export/html")
 async def export_run_html(run_id: int, db: Session = Depends(get_db)):
     """Generate and download HTML report"""
     run = db.query(Run).filter(Run.id == run_id).first()
@@ -990,7 +1000,7 @@ async def get_case_details(run_id: int, case_id: str, db: Session = Depends(get_
         'metrics': metric_details
     }
 
-@app.post("/api/runs/{run_id}/rescore")
+@app.post("/api/evaluations/{run_id}/rescore")
 async def rescore_run(
     run_id: int, 
     request: Request,

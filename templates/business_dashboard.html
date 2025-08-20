@@ -3,47 +3,38 @@
 {% block title %}🤖 {{ experiment.name }} - Overview{% endblock %}
 
 {% block content %}
-<!-- Bot Health Header -->
-<div class="row">
+<!-- Simple Header -->
+<div class="row mb-4">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center p-4 rounded" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/chatbots">Chatbots</a></li>
+                <li class="breadcrumb-item active">{{ experiment.name }}</li>
+            </ol>
+        </nav>
+        <div class="d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center">
-                <div class="me-4">
-                    <h1 class="mb-1 fw-bold">🤖 {{ experiment.name }}</h1>
-                    <p class="mb-0 opacity-75">Customer Support Bot</p>
-                    
-                    <!-- Version Selector -->
-                    {% if experiment.versions %}
-                    <div class="mt-2">
-                        <select class="form-select form-select-sm text-dark" id="versionSelector" onchange="changeVersion()" style="max-width: 250px; background-color: rgba(255,255,255,0.9);">
-                            {% for version in experiment.versions %}
-                            <option value="{{ version.id }}" {% if version.id == current_version.id %}selected{% endif %}>
-                                {{ version.display_name }}{% if loop.first %} (Latest){% endif %} - {{ version.model_config.provider }}/{{ version.model_config.model }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    {% endif %}
-                </div>
+                <h1 class="mb-2 me-3">{{ experiment.name }}</h1>
                 {% set latest_run = runs|selectattr('status', 'equalto', 'completed')|list|first %}
                 {% if latest_run and latest_run.overall_score %}
                     {% set health_score = (latest_run.overall_score * 100)|round|int %}
                     {% if health_score >= 85 %}
-                        <span class="badge bg-success fs-6 px-3 py-2">✅ Healthy</span>
+                        <span class="badge bg-success fs-6">✅ Healthy</span>
                     {% elif health_score >= 70 %}
-                        <span class="badge bg-warning fs-6 px-3 py-2">⚠️ Needs Attention</span>
+                        <span class="badge bg-warning fs-6">⚠️ Needs Attention</span>
                     {% else %}
-                        <span class="badge bg-danger fs-6 px-3 py-2">❌ Poor Performance</span>
+                        <span class="badge bg-danger fs-6">❌ Poor Performance</span>
                     {% endif %}
                 {% else %}
-                    <span class="badge bg-secondary fs-6 px-3 py-2">📊 No Data</span>
+                    <span class="badge bg-secondary fs-6">📊 No Data</span>
                 {% endif %}
             </div>
-            <div class="text-end">
-                <a href="/chatbots/{{ experiment.id }}/detailed" class="btn btn-light btn-sm opacity-75 me-2">Detailed View</a>
-                <a href="/chatbots" class="btn btn-light btn-sm opacity-75">Switch Bot</a>
+            <div>
+                <a href="/evaluations/new" class="btn btn-primary">🚀 New Evaluation</a>
+                <a href="/chatbots/new" class="btn btn-outline-primary ms-2">+ New Version</a>
             </div>
         </div>
+        <p class="text-muted mb-0">{{ experiment.description or "No description" }}</p>
     </div>
 </div>
 
@@ -257,62 +248,85 @@
 </div>
 {% endif %}
 
-<!-- Recent Activity Section -->
+<!-- Evaluations Section -->
 <div class="row mt-4">
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white border-bottom">
-                <h5 class="mb-0 fw-bold">📅 Recent Activity</h5>
+                <h5 class="mb-0 fw-bold">📋 Recent Evaluations</h5>
             </div>
             <div class="card-body p-4">
                 {% if runs %}
-                    {% for run in runs[:3] %}
-                    <div class="d-flex align-items-center mb-3 pb-3 {% if not loop.last %}border-bottom{% endif %}">
-                        <div class="me-3">
-                            {% if run.status == 'completed' %}
-                                {% if run.overall_score >= 0.8 %}
-                                    <span class="text-success fs-5">✅</span>
-                                {% elif run.overall_score >= 0.6 %}
-                                    <span class="text-warning fs-5">⚠️</span>
-                                {% else %}
-                                    <span class="text-danger fs-5">❌</span>
+                <div class="row">
+                    {% for run in runs %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100 evaluation-card" onclick="location.href='/evaluations/{{ run.id }}'">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0 text-truncate">{{ run.name }}</h6>
+                                    {% if run.status == 'completed' %}
+                                        <span class="badge bg-success">✓</span>
+                                    {% elif run.status == 'running' %}
+                                        <span class="badge bg-primary">⏳</span>
+                                    {% elif run.status == 'failed' %}
+                                        <span class="badge bg-danger">✗</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">-</span>
+                                    {% endif %}
+                                </div>
+                                
+                                <p class="card-text text-muted small mb-2">
+                                    {{ run.dataset_version.dataset.name if run.dataset_version else (run.reference_dataset.name if run.reference_dataset else 'Unknown dataset') }}
+                                </p>
+                                
+                                {% if run.status == 'completed' and run.overall_score is not none %}
+                                <div class="row text-center mb-2">
+                                    <div class="col-6">
+                                        <div class="border rounded p-2">
+                                            <div class="h5 mb-0 text-{% if run.overall_score >= 0.8 %}success{% elif run.overall_score >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ "%.2f"|format(run.overall_score) }}
+                                            </div>
+                                            <small class="text-muted">Score</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="border rounded p-2">
+                                            <div class="h5 mb-0 text-{% if run.pass_rate >= 0.8 %}success{% elif run.pass_rate >= 0.6 %}warning{% else %}danger{% endif %}">
+                                                {{ "%.0f"|format(run.pass_rate * 100) }}%
+                                            </div>
+                                            <small class="text-muted">Pass</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% elif run.status == 'running' %}
+                                <div class="progress mb-2" style="height: 8px;">
+                                    {% set progress = (run.completed_test_cases / run.total_test_cases * 100) if run.total_test_cases > 0 else 0 %}
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         role="progressbar" style="width: {{ progress }}%">
+                                    </div>
+                                </div>
+                                <small class="text-muted">{{ run.completed_test_cases }}/{{ run.total_test_cases }} cases</small>
                                 {% endif %}
-                            {% elif run.status == 'running' %}
-                                <span class="text-primary fs-5">🔄</span>
-                            {% else %}
-                                <span class="text-muted fs-5">⏳</span>
-                            {% endif %}
-                        </div>
-                        <div class="flex-grow-1">
-                            <div class="fw-semibold">
-                                {{ run.completed_at.strftime('%B %d') if run.completed_at else run.created_at.strftime('%B %d') }}: 
-                                Evaluation {% if run.status == 'completed' %}completed{% elif run.status == 'running' %}running{% else %}queued{% endif %}
-                                {% if run.overall_score %} - {{ (run.overall_score * 100)|round|int }}% success{% endif %}
                             </div>
-                            <small class="text-muted">
-                                {{ run.dataset.name if run.dataset else 'Unknown dataset' }}
-                                {% if run.total_test_cases %} • {{ run.total_test_cases }} questions{% endif %}
-                            </small>
+                            <div class="card-footer bg-light py-2">
+                                <small class="text-muted">{{ run.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                <span class="badge bg-{% if run.evaluation_source == 'connector' %}primary{% else %}secondary{% endif %} float-end">
+                                    {% if run.evaluation_source == 'connector' %}🔌{% else %}📁{% endif %}
+                                </span>
+                            </div>
                         </div>
-                        {% if run.status == 'completed' %}
-                        <a href="/runs/{{ run.id }}" class="btn btn-sm btn-outline-primary">View</a>
-                        {% endif %}
                     </div>
                     {% endfor %}
-                    
-                    {% if runs|length > 3 %}
-                    <div class="text-center">
-                        <a href="/chatbots/{{ experiment.id }}" class="btn btn-sm btn-outline-secondary">View All Activity</a>
-                    </div>
-                    {% endif %}
+                </div>
                 {% else %}
-                    <div class="text-center py-4">
-                        <div class="text-muted mb-3">
-                            <i class="fs-1">📝</i>
-                        </div>
-                        <h6 class="text-muted mb-3">No activity yet</h6>
-                        <p class="text-muted">Your evaluation history will appear here once you start running tests.</p>
+                <div class="text-center py-4">
+                    <div class="text-muted mb-3">
+                        <i class="fs-1">📝</i>
                     </div>
+                    <h6 class="text-muted mb-3">No evaluations yet</h6>
+                    <p class="text-muted">Your evaluation history will appear here once you start running tests.</p>
+                    <a href="/evaluations/new" class="btn btn-primary">🚀 Run Your First Evaluation</a>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -429,7 +443,7 @@
                                                 </td>
                                                 <td>{{ run.started_at.strftime('%m-%d %H:%M') if run.started_at else run.created_at.strftime('%m-%d %H:%M') }}</td>
                                                 <td>
-                                                    <a href="/runs/{{ run.id }}" class="btn btn-sm btn-outline-primary">View</a>
+                                                    <a href="/evaluations/{{ run.id }}" class="btn btn-sm btn-outline-primary">View</a>
                                                 </td>
                                             </tr>
                                             {% endfor %}
@@ -472,4 +486,40 @@ function changeVersion() {
     window.location.href = url.toString();
 }
 </script>
+
+<style>
+.evaluation-card {
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid #dee2e6;
+}
+
+.evaluation-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border-color: #007bff;
+}
+
+.evaluation-card .card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.evaluation-card .card-body {
+    padding: 1rem;
+}
+
+.evaluation-card .card-footer {
+    font-size: 0.8rem;
+}
+
+.progress {
+    background-color: #f8f9fa;
+}
+
+.border.rounded.p-2 {
+    background-color: #f8f9fa;
+}
+</style>
+
 {% endblock %}

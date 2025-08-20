@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Runs - EvalNow{% endblock %}
+{% block title %}Evaluations - EvalNow{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Runs</h1>
-            <a href="/runs/new" class="btn btn-primary">New Run</a>
+            <h1>Evaluations</h1>
+            <a href="/evaluations/new" class="btn btn-primary">New Evaluation</a>
         </div>
-        <p class="text-muted">View and manage your evaluation runs</p>
+        <p class="text-muted">View and manage your evaluations</p>
     </div>
 </div>
 
@@ -113,7 +113,7 @@
         {% else %}
             <div class="card">
                 <div class="card-body">
-                    <p class="text-muted">No runs created yet. Create your first run to start evaluating.</p>
+                    <p class="text-muted">No evaluations created yet. Create your first evaluation to start testing.</p>
                 </div>
             </div>
         {% endif %}

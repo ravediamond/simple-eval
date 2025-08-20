@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ run.name }} - Run Details{% endblock %}
+{% block title %}{{ run.name }} - Evaluation Details{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -20,12 +20,12 @@
                     {% endif %}
                 </div>
             </div>
-            <a href="/runs" class="btn btn-outline-secondary">Back to Runs</a>
+            <a href="/evaluations" class="btn btn-outline-secondary">Back to Evaluations</a>
         </div>
     </div>
 </div>
 
-<!-- Progress Bar (for running/pending runs) -->
+<!-- Progress Bar (for running/pending evaluations) -->
 {% if run.status in ['running', 'pending'] %}
 <div class="row mt-3">
     <div class="col-12">
@@ -54,7 +54,7 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Run Information</h5>
+                <h5 class="mb-0">Evaluation Information</h5>
             </div>
             <div class="card-body">
                 <table class="table table-borderless">
@@ -145,9 +145,9 @@
                             Export
                         </button>
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="/runs/{{ run.id }}/export/csv">CSV</a></li>
-                            <li><a class="dropdown-item" href="/runs/{{ run.id }}/export/json">JSON</a></li>
-                            <li><a class="dropdown-item" href="/runs/{{ run.id }}/export/html">HTML Report</a></li>
+                            <li><a class="dropdown-item" href="/evaluations/{{ run.id }}/export/csv">CSV</a></li>
+                            <li><a class="dropdown-item" href="/evaluations/{{ run.id }}/export/json">JSON</a></li>
+                            <li><a class="dropdown-item" href="/evaluations/{{ run.id }}/export/html">HTML Report</a></li>
                         </ul>
                     </div>
                 </div>
@@ -316,7 +316,7 @@
                     </div>
                     <div class="col-12">
                         <button type="submit" class="btn btn-primary">Apply Filters</button>
-                        <a href="/runs/{{ run.id }}" class="btn btn-outline-secondary">Clear</a>
+                        <a href="/evaluations/{{ run.id }}" class="btn btn-outline-secondary">Clear</a>
                         {% if current_filters.status == 'failed' %}
                             <span class="badge bg-info ms-2">Showing {{ test_cases|length }} failed cases</span>
                         {% elif current_filters.search %}
@@ -502,11 +502,11 @@
 }
 </style>
 
-<!-- Auto-refresh for running runs -->
+<!-- Auto-refresh for running evaluations -->
 {% if run.status in ['running', 'pending'] %}
 <script>
 function updateProgress() {
-    fetch('/api/runs/{{ run.id }}/status')
+    fetch('/api/evaluations/{{ run.id }}/status')
         .then(response => response.json())
         .then(data => {
             const progressBar = document.getElementById('progress-bar');
@@ -637,7 +637,7 @@ function applyThresholdOverrides() {
     button.disabled = true;
     
     // Send request to re-score endpoint
-    fetch(`/api/runs/{{ run.id }}/rescore`, {
+    fetch(`/api/evaluations/{{ run.id }}/rescore`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
