@@ -29,7 +29,8 @@ class LLMConfiguration(Base):
     additional_params = Column(JSON)  # For provider-specific configurations
     
     
-    # Status and metadata
+    # Configuration type and metadata
+    is_explanation_llm = Column(Boolean, default=False)  # For explanation generation
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -41,6 +42,7 @@ class LLMConfiguration(Base):
             "litellm_openai": "OpenAI",
             "litellm_anthropic": "Anthropic", 
             "litellm_google": "Google",
+            "litellm_google_aistudio": "Google AI Studio",
             "litellm_aws": "AWS Bedrock",
             "litellm_azure": "Azure OpenAI",
             "litellm_ollama": "Ollama",

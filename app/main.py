@@ -1107,6 +1107,7 @@ async def create_llm_config(
     timeout_seconds: int = Form(30),
     rate_limit_per_minute: int = Form(60),
     additional_params: str = Form("{}"),
+    is_explanation_llm: bool = Form(False),
     db: Session = Depends(get_db)
 ):
     """Create new LLM configuration"""
@@ -1142,7 +1143,8 @@ async def create_llm_config(
             max_tokens=max_tokens,
             timeout_seconds=timeout_seconds,
             rate_limit_per_minute=rate_limit_per_minute,
-            additional_params=additional_params_dict
+            additional_params=additional_params_dict,
+            is_explanation_llm=is_explanation_llm
         )
         
         db.add(config)
@@ -1213,6 +1215,7 @@ async def update_llm_config(
     timeout_seconds: int = Form(30),
     rate_limit_per_minute: int = Form(60),
     additional_params: str = Form("{}"),
+    is_explanation_llm: bool = Form(False),
     db: Session = Depends(get_db)
 ):
     """Update LLM configuration"""
@@ -1258,6 +1261,7 @@ async def update_llm_config(
         config.timeout_seconds = timeout_seconds
         config.rate_limit_per_minute = rate_limit_per_minute
         config.additional_params = additional_params_dict
+        config.is_explanation_llm = is_explanation_llm
         config.updated_at = datetime.utcnow()
         
         db.commit()
@@ -1327,6 +1331,7 @@ async def get_llm_config(config_id: int, db: Session = Depends(get_db)):
             "timeout_seconds": config.timeout_seconds,
             "rate_limit_per_minute": config.rate_limit_per_minute,
             "additional_params": json.dumps(config.additional_params or {}, indent=2),
+            "is_explanation_llm": config.is_explanation_llm,
             "display_provider": config.display_provider,
             "created_at": config.created_at.isoformat(),
             "updated_at": config.updated_at.isoformat()
