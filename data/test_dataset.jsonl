@@ -1,0 +1,10 @@
+{"question": "What is the capital of France?", "reference": "Paris", "answer": "The capital of France is Paris"}
+{"question": "What is 2 + 2?", "reference": "4", "answer": "2 + 2 equals 4"}
+{"question": "Who wrote Romeo and Juliet?", "reference": "William Shakespeare", "answer": "Romeo and Juliet was written by William Shakespeare"}
+{"question": "What is the largest planet in our solar system?", "reference": "Jupiter", "answer": "Jupiter is the largest planet in our solar system"}
+{"question": "What year did World War II end?", "reference": "1945", "answer": "World War II ended in 1945"}
+{"question": "What is the chemical symbol for gold?", "reference": "Au", "answer": "The chemical symbol for gold is Au"}
+{"question": "Who painted the Mona Lisa?", "reference": "Leonardo da Vinci", "answer": "The Mona Lisa was painted by Leonardo da Vinci"}
+{"question": "What is the speed of light?", "reference": "299792458 meters per second", "answer": "The speed of light is approximately 299792458 meters per second"}
+{"question": "What is the smallest unit of matter?", "reference": "Atom", "answer": "The smallest unit of matter is an atom"}
+{"question": "Who developed the theory of relativity?", "reference": "Albert Einstein", "answer": "Albert Einstein developed the theory of relativity"}

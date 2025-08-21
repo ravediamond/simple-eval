@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "evalnow"
+name = "simple-eval"
 version = "0.1.0"
-description = "EvalNow - Lightweight chatbot evaluation platform"
+description = "Simple AI Evaluation Tool - Quick prototype for AI response evaluation"
 authors = ["User"]
 readme = "README.md"
 package-mode = false
@@ -13,10 +13,8 @@ uvicorn = "^0.35.0"
 jinja2 = "^3.1.6"
 python-multipart = "^0.0.20"
 python-dotenv = "^1.1.1"
-sqlalchemy = "^2.0.43"
-aiosqlite = "^0.21.0"
-litellm = "^1.75.8"
-deepeval = "^3.4.0"
+google-generativeai = "^0.8.0"
+pandas = "^2.3.1"
 
 [tool.poetry.group.dev.dependencies]
 

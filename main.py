@@ -10,7 +10,7 @@ if __name__ == "__main__":
     debug = os.getenv("DEBUG", "false").lower() == "true"
     
     uvicorn.run(
-        "app.main:app",
+        "app.simple_main:app",
         host=host,
         port=port,
         reload=debug
