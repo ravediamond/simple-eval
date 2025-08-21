@@ -30,9 +30,9 @@ EvalNow helps you quickly evaluate AI responses by:
 ## Key Features
 
 ### ✅ Privacy First
-- **No data storage** - Files processed in memory only
+- **No data storage** - Files processed and discarded immediately
 - **No user tracking** - Simple, anonymous evaluation
-- **Local processing** - Runs entirely on your machine
+- **Secure processing** - Your data is processed securely in the cloud
 
 ### ✅ Simple Upload
 - Support for CSV, JSONL, and Excel files
