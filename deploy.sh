@@ -5,10 +5,10 @@
 
 set -e
 
-PROJECT_ID="mcph-dev"
-SERVICE_NAME="simple-eval"
-REGION="us-central1"
-IMAGE_TAG="gcr.io/$PROJECT_ID/$SERVICE_NAME"
+PROJECT_ID="evalnow-prod"
+SERVICE_NAME="evalnow"
+REGION="europe-west9"
+IMAGE_TAG="europe-west9-docker.pkg.dev/$PROJECT_ID/$SERVICE_NAME/$SERVICE_NAME:latest"
 
 echo "🚀 Starting deployment for $SERVICE_NAME..."
 
@@ -18,21 +18,28 @@ docker build -t $IMAGE_TAG .
 
 # Configure Docker to use gcloud as a credential helper
 echo "🔧 Configuring Docker authentication..."
-gcloud auth configure-docker
+gcloud auth configure-docker europe-west9-docker.pkg.dev
 
 # Push the image to Google Container Registry
 echo "⬆️  Pushing image to Container Registry..."
 docker push $IMAGE_TAG
 
 echo "✅ Image pushed successfully!"
+
+# Deploy to Cloud Run
+echo "🚀 Deploying to Cloud Run..."
+gcloud run deploy $SERVICE_NAME \
+    --image $IMAGE_TAG \
+    --platform managed \
+    --region $REGION \
+    --allow-unauthenticated \
+    --port 8080 \
+    --memory 1Gi \
+    --cpu 1 \
+    --min-instances 0 \
+    --max-instances 10
+
 echo ""
-echo "📋 Next steps:"
-echo "1. Go to Google Cloud Console"
-echo "2. Navigate to Cloud Run"
-echo "3. Click 'Create Service'"
-echo "4. Use this container image: $IMAGE_TAG"
-echo "5. Set port to: 8080"
-echo "6. Allow unauthenticated invocations"
-echo "7. Set minimum instances to 0 (for cost optimization)"
-echo ""
-echo "🌍 Your app will be available at: https://$SERVICE_NAME-[hash]-$REGION.a.run.app"
+echo "✅ Deployment complete!"
+echo "🌍 Your app is available at:"
+gcloud run services describe $SERVICE_NAME --region $REGION --format "value(status.url)"
