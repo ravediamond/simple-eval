@@ -3,18 +3,24 @@ import json
 import tempfile
 import csv
 import pandas as pd
+import io
+import uuid
 from typing import List, Dict, Any
 from datetime import datetime
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse, RedirectResponse
 from dotenv import load_dotenv
 import google.generativeai as genai
+from .pdf_generator import EvaluationPDFGenerator
 
 load_dotenv()
 
-app = FastAPI(title="Simple Eval", description="Simple AI evaluation tool")
+app = FastAPI(title="EvalNow", description="AI evaluation made simple")
+
+# Simple in-memory storage for results (in production, use Redis or database)
+results_cache = {}
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -369,6 +375,17 @@ async def upload_and_evaluate(
             "ai_analysis": ai_analysis
         }
 
+        # Store results in cache with a unique ID for PDF generation
+        result_id = str(uuid.uuid4())
+        evaluation_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        results_cache[result_id] = {
+            "results": results,
+            "insights": insights,
+            "filename": file.filename,
+            "evaluation_time": evaluation_time
+        }
+
         return templates.TemplateResponse(
             "results.html",
             {
@@ -376,7 +393,8 @@ async def upload_and_evaluate(
                 "results": results,
                 "insights": insights,
                 "filename": file.filename,
-                "evaluation_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "evaluation_time": evaluation_time,
+                "result_id": result_id,
             },
         )
 
@@ -390,16 +408,48 @@ async def upload_and_evaluate(
 @app.get("/evaluation", response_class=HTMLResponse)
 async def evaluation_page(request: Request):
     """Evaluation page - redirects to landing for upload"""
-    return templates.TemplateResponse("landing.html", {"request": request})
+    return RedirectResponse(url="/", status_code=302)
 
 
 @app.get("/evaluations", response_class=HTMLResponse)
 async def evaluations_page(request: Request):
     """Simple evaluations page - redirects to landing for now"""
-    return templates.TemplateResponse("landing.html", {"request": request})
+    return RedirectResponse(url="/", status_code=302)
 
+
+@app.get("/download-pdf/{result_id}")
+async def download_pdf(result_id: str):
+    """Generate and download PDF report"""
+    if result_id not in results_cache:
+        raise HTTPException(status_code=404, detail="Results not found")
+    
+    cached_data = results_cache[result_id]
+    
+    try:
+        # Generate PDF
+        pdf_generator = EvaluationPDFGenerator()
+        pdf_buffer = pdf_generator.generate_pdf(
+            results=cached_data["results"],
+            insights=cached_data["insights"],
+            filename=cached_data["filename"],
+            evaluation_time=cached_data["evaluation_time"]
+        )
+        
+        # Create safe filename
+        safe_filename = cached_data["filename"].replace(" ", "_").replace("/", "_")
+        pdf_filename = f"evalnow_report_{safe_filename}_{result_id[:8]}.pdf"
+        
+        # Return PDF as download
+        return StreamingResponse(
+            io.BytesIO(pdf_buffer.read()),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={pdf_filename}"}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
 
 @app.get("/healthz")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "ok", "service": "simple-eval"}
+    return {"status": "ok", "service": "evalnow"}

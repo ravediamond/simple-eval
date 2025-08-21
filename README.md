@@ -1,4 +1,4 @@
-# Simple Eval
+# EvalNow
 
 A simple AI evaluation tool for quick prototyping and validation. Upload your data, get insights - no complex setup required.
 
@@ -20,7 +20,7 @@ python main.py
 
 ## What This Tool Does
 
-Simple Eval helps you quickly evaluate AI responses by:
+EvalNow helps you quickly evaluate AI responses by:
 
 1. **Upload your data** - CSV, JSONL, or Excel files with question, reference, and answer columns
 2. **Get instant evaluation** - AI-powered scoring using Google's Gemini
@@ -51,6 +51,7 @@ Simple Eval helps you quickly evaluate AI responses by:
 - **Score Distribution**: Excellent (90%+), Good (70-89%), Needs Work (50-69%), Poor (<50%)
 - **Detailed Results**: Question-by-question breakdown with reasoning
 - **Interactive Interface**: Modern, responsive design
+- **PDF Reports**: Professional downloadable reports with charts and analysis
 
 ## File Format
 
@@ -89,7 +90,7 @@ Sample datasets included in `data/`:
 - **No Database**: In-memory processing only
 - **Dependencies**: Minimal set focused on core functionality
 
-## Why Simple Eval?
+## Why EvalNow?
 
 This tool was built for rapid prototyping and user validation:
 
@@ -103,7 +104,7 @@ This tool was built for rapid prototyping and user validation:
 
 ### Project Structure
 ```
-simple-eval/
+evalnow/
 ├── app/
 │   └── simple_main.py      # Main FastAPI application
 ├── templates/
