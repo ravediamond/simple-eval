@@ -449,6 +449,20 @@ async def download_pdf(result_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
 
+@app.get("/about", response_class=HTMLResponse)
+async def about_page(request: Request):
+    """About page"""
+    return templates.TemplateResponse("about.html", {"request": request})
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    """Privacy policy page"""
+    from datetime import datetime
+    current_date = datetime.now().strftime("%B %d, %Y")
+    return templates.TemplateResponse("privacy.html", {"request": request, "current_date": current_date})
+
+
 @app.get("/healthz")
 async def health_check():
     """Health check endpoint"""

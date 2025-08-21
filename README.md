@@ -106,7 +106,8 @@ This tool was built for rapid prototyping and user validation:
 ```
 evalnow/
 ├── app/
-│   └── simple_main.py      # Main FastAPI application
+│   ├── app.py              # Main FastAPI application
+│   └── pdf_generator.py    # PDF report generation
 ├── templates/
 │   ├── landing.html        # Landing page with upload
 │   └── results.html        # Results with insights
