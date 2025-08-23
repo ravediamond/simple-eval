@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - EvalNow</title>
+    <link rel="icon" type="image/x-icon" href="/static/public/favicon.ico">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+        
+        .navbar-brand {
+            font-weight: 700;
+            color: #333 !important;
+            font-size: 1.5rem;
+        }
+        
+        .main-content {
+            padding: 2rem 0 4rem 0;
+        }
+        
+        .page-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            color: white;
+        }
+        
+        .page-title {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            background: linear-gradient(45deg, #fff, #f0f8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .page-subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        
+        .metrics-section {
+            margin-bottom: 3rem;
+        }
+        
+        .section-title {
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            opacity: 0.95;
+        }
+        
+        .kpi-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            height: 100%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .kpi-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            background: rgba(255, 255, 255, 1);
+        }
+        
+        .kpi-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, currentColor, currentColor);
+            -webkit-background-clip: text;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+        
+        .kpi-value {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: #1a1a1a;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .kpi-label {
+            color: #555;
+            font-weight: 600;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .kpi-sublabel {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+            font-weight: 500;
+        }
+        
+        .chart-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .chart-card:hover {
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+        }
+        
+        .chart-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        .insights-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .insights-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .insight-item {
+            background: rgba(248, 249, 250, 0.8);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid;
+            font-weight: 500;
+        }
+        
+        .insight-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            color: white;
+            text-align: center;
+        }
+        
+        .loading-spinner .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            color: white;
+        }
+        
+        .error-message {
+            background: rgba(248, 215, 218, 0.95);
+            color: #721c24;
+            padding: 2rem;
+            border-radius: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .text-primary { color: #007bff !important; }
+        .text-success { color: #28a745 !important; }
+        .text-info { color: #17a2b8 !important; }
+        .text-warning { color: #ffc107 !important; }
+        .text-danger { color: #dc3545 !important; }
+        .text-purple { color: #6f42c1 !important; }
+        .text-blue { color: #0d6efd !important; }
+        .text-orange { color: #fd7e14 !important; }
+        .text-teal { color: #20c997 !important; }
+        .text-indigo { color: #6610f2 !important; }
+        .text-secondary { color: #6c757d !important; }
+        .text-dark { color: #343a40 !important; }
+        
+        /* Animations */
+        .kpi-card, .chart-card, .insights-card {
+            animation: fadeInUp 0.6s ease-out;
+        }
+        
+        .kpi-card:nth-child(1) { animation-delay: 0.1s; }
+        .kpi-card:nth-child(2) { animation-delay: 0.2s; }
+        .kpi-card:nth-child(3) { animation-delay: 0.3s; }
+        .kpi-card:nth-child(4) { animation-delay: 0.4s; }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Responsive design improvements */
+        @media (max-width: 768px) {
+            .page-title {
+                font-size: 2rem;
+            }
+            
+            .kpi-value {
+                font-size: 2rem;
+            }
+            
+            .kpi-card {
+                padding: 1.5rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <img src="/static/public/icon.png" alt="EvalNow" style="width: 32px; height: 32px; margin-right: 0.75rem;">
+                EvalNow
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Home</a>
+                <a class="nav-link" href="/about">About</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container">
+            <div class="page-header">
+                <h1 class="page-title">📊 Analytics Dashboard</h1>
+                <p class="page-subtitle">Track user engagement and product metrics</p>
+            </div>
+
+            <!-- KPI Grid -->
+            <div class="metrics-section">
+                <div id="kpi-container">
+                    <div class="loading-spinner">
+                        <div>
+                            <div class="spinner-border me-3" role="status"></div>
+                            <div>Loading analytics data...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="metrics-section" id="charts-section" style="display: none;">
+                <h2 class="section-title">📈 Visual Analytics</h2>
+                <div class="row">
+                    <div class="col-lg-6 mb-4">
+                        <div class="chart-card">
+                            <h5 class="chart-title">Dataset Size Distribution</h5>
+                            <div class="chart-container">
+                                <canvas id="datasetChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 mb-4">
+                        <div class="chart-card">
+                            <h5 class="chart-title">User Engagement Flow</h5>
+                            <div class="chart-container">
+                                <canvas id="funnelChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Insights Section -->
+            <div class="metrics-section" id="insights-section" style="display: none;">
+                <h2 class="section-title">💡 Key Insights</h2>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="insights-card">
+                            <div class="insights-title">
+                                <i class="fas fa-lightbulb text-warning me-2"></i>
+                                Actionable Insights
+                            </div>
+                            <div id="insights-content">
+                                <!-- Insights will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Waiting List Section -->
+            <div class="metrics-section" id="waitlist-section">
+                <h2 class="section-title">⏳ Waiting List Management</h2>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="insights-card">
+                            <div class="insights-title">
+                                <i class="fas fa-clock text-info me-2"></i>
+                                Waiting List Entries
+                            </div>
+                            <div id="waitlist-container">
+                                <div class="loading-spinner">
+                                    <div>
+                                        <div class="spinner-border me-3" role="status"></div>
+                                        <div>Loading waiting list...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer style="background: #f8f9fa; border-top: 1px solid #eee; padding: 2rem 0 1rem 0; margin-top: 3rem;">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-0" style="color: #666;">&copy; 2024 EvalNow. All rights reserved.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <a href="/" style="color: #666; text-decoration: none; margin: 0 1rem;">Home</a>
+                    <a href="/about" style="color: #666; text-decoration: none; margin: 0 1rem;">About</a>
+                    <a href="/privacy" style="color: #666; text-decoration: none; margin: 0 1rem;">Privacy</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let datasetChart = null;
+        let funnelChart = null;
+
+        async function loadAnalytics() {
+            try {
+                const response = await fetch('/api/analytics/kpis');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                console.log('Analytics data received:', data); // Debug log
+                
+                displayKPIs(data);
+                displayCharts(data);
+                displayInsights(data);
+                
+            } catch (error) {
+                console.error('Analytics error:', error); // Debug log
+                showError('Failed to load analytics data: ' + error.message);
+            }
+        }
+
+        async function loadWaitlist() {
+            try {
+                const response = await fetch('/api/waitlist');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showWaitlistError(data.error);
+                    return;
+                }
+                
+                displayWaitlist(data.waitlist || []);
+                
+            } catch (error) {
+                console.error('Waitlist error:', error);
+                showWaitlistError('Failed to load waiting list: ' + error.message);
+            }
+        }
+
+        function displayKPIs(data) {
+            if (!data) {
+                showError('No analytics data received');
+                return;
+            }
+            
+            const kpiHtml = `
+                <h2 class="section-title">🎯 Key Metrics</h2>
+                <div class="row">
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-primary">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="kpi-value">${data.total_users || 0}</div>
+                            <div class="kpi-label">Total Visitors</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-success">
+                                <i class="fas fa-upload"></i>
+                            </div>
+                            <div class="kpi-value">${data.active_evaluators || 0}</div>
+                            <div class="kpi-label">Active Evaluators</div>
+                            <div class="kpi-sublabel">${data.activation_rate || 0}% activation rate</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-info">
+                                <i class="fas fa-redo"></i>
+                            </div>
+                            <div class="kpi-value">${data.repeat_users}</div>
+                            <div class="kpi-label">Repeat Users</div>
+                            <div class="kpi-sublabel">${data.retention_rate}% retention rate</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-danger">
+                                <i class="fas fa-file-pdf"></i>
+                            </div>
+                            <div class="kpi-value">${data.total_pdf_downloads}</div>
+                            <div class="kpi-label">PDF Downloads</div>
+                            <div class="kpi-sublabel">${data.pdf_conversion_rate}% conversion rate</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h2 class="section-title">📊 Usage Analytics</h2>
+                <div class="row">
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-warning">
+                                <i class="fas fa-database"></i>
+                            </div>
+                            <div class="kpi-value">${data.total_evaluations}</div>
+                            <div class="kpi-label">Total Evaluations</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-secondary">
+                                <i class="fas fa-calculator"></i>
+                            </div>
+                            <div class="kpi-value">${data.avg_dataset_size}</div>
+                            <div class="kpi-label">Avg Dataset Size</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-dark">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="kpi-value">${Math.round(data.total_evaluations / Math.max(data.active_evaluators, 1) * 10) / 10}</div>
+                            <div class="kpi-label">Evals per User</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h2 class="section-title">🪙 Token Usage & Costs</h2>
+                <div class="row">
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-purple">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            <div class="kpi-value">${data.total_tokens_used.toLocaleString()}</div>
+                            <div class="kpi-label">Total Tokens Used</div>
+                            <div class="kpi-sublabel">All time consumption</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-indigo">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                            <div class="kpi-value">${data.current_month_tokens.toLocaleString()}</div>
+                            <div class="kpi-label">This Month Tokens</div>
+                            <div class="kpi-sublabel">Current period usage</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-success">
+                                <i class="fas fa-dollar-sign"></i>
+                            </div>
+                            <div class="kpi-value">$${data.current_month_llm_cost}</div>
+                            <div class="kpi-label">This Month Cost</div>
+                            <div class="kpi-sublabel">Estimated API cost</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="kpi-card">
+                            <div class="kpi-icon text-teal">
+                                <i class="fas fa-calculator"></i>
+                            </div>
+                            <div class="kpi-value">${data.avg_tokens_per_evaluation}</div>
+                            <div class="kpi-label">Avg Tokens/Eval</div>
+                            <div class="kpi-sublabel">Efficiency metric</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('kpi-container').innerHTML = kpiHtml;
+            const chartsSection = document.getElementById('charts-section');
+            const insightsSection = document.getElementById('insights-section');
+            if (chartsSection) chartsSection.style.display = 'block';
+            if (insightsSection) insightsSection.style.display = 'block';
+        }
+
+        function displayCharts(data) {
+            if (!data || !data.dataset_size_distribution) {
+                console.warn('Chart data not available');
+                return;
+            }
+            
+            // Dataset Size Distribution Chart
+            const datasetCanvas = document.getElementById('datasetChart');
+            if (!datasetCanvas) {
+                console.warn('Chart canvas not found');
+                return;
+            }
+            const datasetCtx = datasetCanvas.getContext('2d');
+            if (datasetChart) datasetChart.destroy();
+            
+            datasetChart = new Chart(datasetCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Toy (<10)', 'Small (10-100)', 'Medium (100-1K)', 'Large (1K+)'],
+                    datasets: [{
+                        data: [
+                            data.dataset_size_distribution.toy,
+                            data.dataset_size_distribution.small,
+                            data.dataset_size_distribution.medium,
+                            data.dataset_size_distribution.large
+                        ],
+                        backgroundColor: ['#ffc107', '#28a745', '#17a2b8', '#dc3545'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            // Funnel Chart (simulated with bar chart)  
+            const funnelCanvas = document.getElementById('funnelChart');
+            if (!funnelCanvas) {
+                console.warn('Funnel chart canvas not found');
+                return;
+            }
+            const funnelCtx = funnelCanvas.getContext('2d');
+            if (funnelChart) funnelChart.destroy();
+            
+            funnelChart = new Chart(funnelCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Visitors', 'Evaluators', 'PDF Downloads'],
+                    datasets: [{
+                        data: [data.total_users, data.active_evaluators, data.total_pdf_downloads],
+                        backgroundColor: ['#007bff', '#28a745', '#dc3545'],
+                        borderRadius: 4,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayInsights(data) {
+            if (!data) {
+                console.warn('Insights data not available');
+                return;
+            }
+            
+            let insights = [];
+            
+            if (data.activation_rate < 50) {
+                insights.push({text: "Low activation rate - consider improving onboarding experience", color: "#dc3545"});
+            } else if (data.activation_rate > 70) {
+                insights.push({text: "Excellent activation rate - users are engaged from the start", color: "#28a745"});
+            }
+            
+            if (data.retention_rate > 70) {
+                insights.push({text: "Great retention rate - users find value and return", color: "#28a745"});
+            } else if (data.retention_rate < 30) {
+                insights.push({text: "Low retention - investigate user experience after first evaluation", color: "#ffc107"});
+            }
+            
+            if (data.pdf_conversion_rate > 50) {
+                insights.push({text: "High PDF conversion - users find results valuable for sharing", color: "#28a745"});
+            } else if (data.pdf_conversion_rate < 20) {
+                insights.push({text: "Low PDF conversion - consider improving export experience", color: "#17a2b8"});
+            }
+            
+            const avgEvalsPerUser = data.total_evaluations / Math.max(data.active_evaluators, 1);
+            if (avgEvalsPerUser > 3) {
+                insights.push({text: "High usage per user - good product-market fit", color: "#28a745"});
+            } else if (avgEvalsPerUser < 1.5) {
+                insights.push({text: "Users typically run single evaluations - consider promoting repeat usage", color: "#6f42c1"});
+            }
+            
+            if (data.avg_dataset_size < 20) {
+                insights.push({text: "Users mainly testing with small datasets - promote real workload usage", color: "#fd7e14"});
+            } else if (data.avg_dataset_size > 100) {
+                insights.push({text: "Users running production-scale evaluations - good for enterprise positioning", color: "#20c997"});
+            }
+
+            // Cost insights
+            if (data.current_month_llm_cost > 50) {
+                insights.push({text: "High monthly LLM costs - monitor usage and consider optimization", color: "#ffc107"});
+            } else if (data.current_month_llm_cost < 5) {
+                insights.push({text: "Low monthly costs - room for growth without budget concerns", color: "#28a745"});
+            }
+            
+            const insightsHtml = insights.length > 0 
+                ? insights.map(insight => `<div class="insight-item" style="border-left-color: ${insight.color}">${insight.text}</div>`).join('')
+                : '<div class="insight-item" style="border-left-color: #6c757d;">No specific insights available yet - more data needed for analysis.</div>';
+            
+            document.getElementById('insights-content').innerHTML = insightsHtml;
+        }
+
+        function showError(message) {
+            document.getElementById('kpi-container').innerHTML = `
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${message}
+                    <div class="mt-2 small">
+                        Make sure Firestore is set up and GOOGLE_CLOUD_PROJECT is configured.
+                    </div>
+                </div>
+            `;
+        }
+
+        function showWaitlistError(message) {
+            document.getElementById('waitlist-container').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${message}
+                </div>
+            `;
+        }
+
+        function displayWaitlist(waitlist) {
+            if (!waitlist || waitlist.length === 0) {
+                document.getElementById('waitlist-container').innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No waiting list entries yet.
+                    </div>
+                `;
+                return;
+            }
+
+            const waitlistHtml = `
+                <div class="mb-3">
+                    <small class="text-muted">${waitlist.length} entries on waiting list</small>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Company</th>
+                                <th>Use Case</th>
+                                <th>Requested</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${waitlist.map(entry => `
+                                <tr id="entry-${entry.id}">
+                                    <td>
+                                        <strong>${entry.email}</strong>
+                                    </td>
+                                    <td>
+                                        ${entry.company || '<em>Not specified</em>'}
+                                    </td>
+                                    <td>
+                                        ${entry.use_case ? `<small>${entry.use_case}</small>` : '<em>Not specified</em>'}
+                                    </td>
+                                    <td>
+                                        <small>${new Date(entry.requested_at).toLocaleDateString()}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge ${entry.status === 'approved' ? 'bg-success' : 'bg-warning'}">
+                                            ${entry.status}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        ${entry.status === 'pending' ? `
+                                            <button class="btn btn-sm btn-success me-2" onclick="approveEntry('${entry.id}')">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                        ` : ''}
+                                        <button class="btn btn-sm btn-danger" onclick="removeEntry('${entry.id}')">
+                                            <i class="fas fa-trash"></i> Remove
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            document.getElementById('waitlist-container').innerHTML = waitlistHtml;
+        }
+
+        async function approveEntry(entryId) {
+            try {
+                const response = await fetch(`/api/waitlist/${entryId}/approve`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                // Refresh waitlist
+                await loadWaitlist();
+            } catch (error) {
+                alert('Failed to approve entry: ' + error.message);
+            }
+        }
+
+        async function removeEntry(entryId) {
+            if (!confirm('Are you sure you want to remove this entry from the waiting list?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/waitlist/${entryId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                // Refresh waitlist
+                await loadWaitlist();
+            } catch (error) {
+                alert('Failed to remove entry: ' + error.message);
+            }
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAnalytics();
+            loadWaitlist();
+        });
+        
+        // Auto-refresh every 30 seconds
+        setInterval(function() {
+            loadAnalytics();
+            loadWaitlist();
+        }, 30000);
+    </script>
+</body>
+</html>

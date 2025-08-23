@@ -273,8 +273,8 @@
                             <div class="metric-icon">
                                 <i class="fas fa-star"></i>
                             </div>
-                            <div class="metric-value">{{ "%.1f" | format(insights.average_score * 100) }}%</div>
-                            <div class="metric-label">Average Score</div>
+                            <div class="metric-value">{{ "%.1f" | format(insights.pass_rate * 100) }}%</div>
+                            <div class="metric-label">Pass Rate</div>
                         </div>
                     </div>
                     
@@ -357,20 +357,18 @@
                                     </div>
                                 </td>
                                 <td style="padding: 1rem;">
-                                    {% set score_percent = (result.score * 100) | int %}
+                                    {% set score_value = result.score | int %}
                                     <div style="text-align: center;">
-                                        {% if score_percent >= 90 %}
-                                            <div class="badge score-badge bg-success" style="font-size: 1rem; padding: 0.5rem 1rem; margin-bottom: 0.5rem; display: block;">{{ score_percent }}%</div>
-                                            <small class="text-success">Excellent</small>
-                                        {% elif score_percent >= 70 %}
-                                            <div class="badge score-badge bg-info" style="font-size: 1rem; padding: 0.5rem 1rem; margin-bottom: 0.5rem; display: block;">{{ score_percent }}%</div>
-                                            <small class="text-info">Good</small>
-                                        {% elif score_percent >= 50 %}
-                                            <div class="badge score-badge bg-warning" style="font-size: 1rem; padding: 0.5rem 1rem; margin-bottom: 0.5rem; display: block;">{{ score_percent }}%</div>
-                                            <small class="text-warning">Needs Work</small>
+                                        {% if score_value == 1 %}
+                                            <div class="badge score-badge bg-success" style="font-size: 1.2rem; padding: 0.6rem 1.2rem; margin-bottom: 0.5rem; display: block;">
+                                                <i class="fas fa-check me-2"></i>PASS
+                                            </div>
+                                            <small class="text-success fw-bold">Correct Answer</small>
                                         {% else %}
-                                            <div class="badge score-badge bg-danger" style="font-size: 1rem; padding: 0.5rem 1rem; margin-bottom: 0.5rem; display: block;">{{ score_percent }}%</div>
-                                            <small class="text-danger">Poor</small>
+                                            <div class="badge score-badge bg-danger" style="font-size: 1.2rem; padding: 0.6rem 1.2rem; margin-bottom: 0.5rem; display: block;">
+                                                <i class="fas fa-times me-2"></i>FAIL
+                                            </div>
+                                            <small class="text-danger fw-bold">Incorrect Answer</small>
                                         {% endif %}
                                     </div>
                                 </td>
@@ -461,8 +459,8 @@
                             </div>
                             <div class="col-md-4">
                                 <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
-                                    <div style="font-size: 2rem; font-weight: 700; color: #1a1a1a;">{{ "%.1f" | format(insights.average_score * 100) }}%</div>
-                                    <div style="color: #666; font-size: 0.9rem;">Average Score</div>
+                                    <div style="font-size: 2rem; font-weight: 700; color: #1a1a1a;">{{ "%.1f" | format(insights.pass_rate * 100) }}%</div>
+                                    <div style="color: #666; font-size: 0.9rem;">Pass Rate</div>
                                 </div>
                             </div>
                             <div class="col-md-4">
@@ -499,7 +497,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        Question {{ loop.index }} - Score: {{ (result.score * 100) | int }}%
+                        Question {{ loop.index }} - Result: {% if result.score == 1 %}PASS{% else %}FAIL{% endif %}
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
@@ -546,21 +544,20 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/analytics.js"></script>
     <script>
         // Create distribution chart
         const ctx = document.getElementById('distributionChart').getContext('2d');
         new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['Excellent', 'Good', 'Needs Work', 'Poor'],
+                labels: ['Pass', 'Fail'],
                 datasets: [{
                     data: [
-                        {{ insights.distribution.excellent }},
-                        {{ insights.distribution.good }},
-                        {{ insights.distribution.needs_improvement }},
-                        {{ insights.distribution.poor }}
+                        {{ insights.distribution.excellent + insights.distribution.good }},
+                        {{ insights.distribution.needs_improvement + insights.distribution.poor }}
                     ],
-                    backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545'],
+                    backgroundColor: ['#28a745', '#dc3545'],
                     borderWidth: 0
                 }]
             },
@@ -574,6 +571,19 @@
                 }
             }
         });
+        
+        // Track evaluation completion
+        if (window.trackEvaluationCompleted) {
+            window.trackEvaluationCompleted({
+                total_questions: {{ insights.total_questions }},
+                filename: "{{ filename }}",
+                average_score: {{ insights.average_score }},
+                pass_rate: {{ insights.pass_rate }},
+                total_tokens: {{ insights.total_tokens }},
+                input_tokens: {{ insights.input_tokens }},
+                output_tokens: {{ insights.output_tokens }}
+            });
+        }
     </script>
 </body>
 </html>
