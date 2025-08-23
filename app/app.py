@@ -132,38 +132,38 @@ AI Judgment: {result.reasoning}
         pass_rate = sum(1 for r in results if r.score >= 0.7) / total_questions if total_questions > 0 else 0
         
         # Create comprehensive prompt for analysis
-        analysis_prompt = f"""You are an expert AI evaluation analyst. Please analyze the following evaluation results and provide a comprehensive summary with actionable insights.
+        analysis_prompt = f"""You are a business consultant helping a product manager understand their chatbot's performance for their stakeholders and team.
 
-EVALUATION OVERVIEW:
-- File: {filename}
-- Total Questions: {total_questions}
-- Average Score: {average_score:.1%}
-- Pass Rate (≥70%): {pass_rate:.1%}
+CHATBOT PERFORMANCE REPORT:
+- File Analyzed: {filename}
+- Questions Tested: {total_questions}
+- Success Rate: {average_score:.1%}
+- Customer Satisfaction Rate: {pass_rate:.1%} (answers that would satisfy customers)
 
-DETAILED EVALUATION DATA:
+DETAILED CUSTOMER INTERACTIONS:
 {''.join(evaluation_data)}
 
-Please provide a JSON response with the following structure:
+Please provide a JSON response with executive summary insights:
 {{
-    "summary": "A 2-3 sentence executive summary of the overall AI performance",
+    "summary": "Write 2-3 sentences explaining how well this chatbot serves customers, in language a CEO would understand",
     "key_insights": [
-        "List 3-5 specific insights about patterns, strengths, and weaknesses you observe",
-        "Focus on actionable observations from the data"
+        "List 3-5 insights about what the chatbot does well or struggles with",
+        "Focus on customer impact: 'Customers get helpful answers for X but struggle with Y'",
+        "Use business terms, not technical jargon"
     ],
     "recommendations": [
-        "List 3-5 specific recommendations for improving the AI system",
-        "Base recommendations on the actual evaluation results"
+        "List 3-5 specific actions the product team should take",
+        "Focus on business impact: 'Improve X to reduce customer frustration' or 'Train on Y to increase satisfaction'"
     ]
 }}
 
-Focus on:
-1. Common patterns in correct vs incorrect responses
-2. Types of questions where the AI excels or struggles
-3. Quality of reasoning in AI judgments
-4. Specific areas for improvement
-5. Actionable recommendations based on the data
+Think like a business consultant answering:
+• Are customers getting the help they need?
+• What patterns would frustrate or delight customers?
+• What should the product team prioritize to improve customer experience?
+• How can we make this chatbot more valuable for the business?
 
-Provide concrete, specific insights rather than generic advice."""
+Write insights that a product manager can share with executives or use to guide their team's priorities."""
 
         try:
             response = self.analysis_model.generate_content(analysis_prompt)
@@ -228,33 +228,35 @@ Provide concrete, specific insights rather than generic advice."""
                 reasoning="No AI model configured. Cannot evaluate without Gemini API key.",
             )
 
-        prompt = f"""You are an expert evaluator. Please evaluate the given answer to the question against the reference answer.
+        prompt = f"""You are a business consultant helping a product manager understand if their chatbot is working well for customers.
 
-Question: {question}
-Reference Answer: {reference}
-Given Answer: {answer}
+CUSTOMER'S QUESTION: {question}
+IDEAL ANSWER: {reference}
+CHATBOT'S ACTUAL ANSWER: {answer}
 
-Evaluate on these criteria:
-1. Accuracy: Is the answer factually correct?
-2. Completeness: Does it fully answer the question?
-3. Relevance: Does it directly address what was asked?
+Your job: Decide if a customer would be satisfied with this chatbot answer.
 
-You must provide a BINARY evaluation - either the answer is acceptable (1) or not acceptable (0).
+Ask yourself:
+• Does this actually help the customer solve their problem?
+• Is the information correct and useful?
+• Would a customer feel their question was properly answered?
 
-An answer gets a score of 1 (PASS) if:
-- It is factually correct AND addresses the question adequately
-- Minor wording differences are acceptable if the meaning is correct
-- The core information matches the reference answer
+DECISION RULES:
+✅ PASS (Score: 1) if the answer:
+- Gives the customer the help they need
+- Is factually correct (even if worded differently than the ideal answer)
+- Actually addresses what the customer asked about
+- Minor style differences are fine if the core help is there
 
-An answer gets a score of 0 (FAIL) if:
-- It contains factual errors
-- It doesn't answer the question asked
-- It's completely irrelevant or nonsensical
-- It's missing critical information
+❌ FAIL (Score: 0) if the answer:
+- Contains wrong information that could mislead the customer
+- Doesn't actually help with what the customer asked
+- Is confusing, irrelevant, or unhelpful
+- Misses critical information the customer needs
 
 Format your response as:
 SCORE: [either 0 or 1]
-REASONING: [your explanation - be specific about why it passed or failed]"""
+REASONING: [Explain in business terms why this would help or frustrate a customer]"""
 
         try:
             response = self.judge_model.generate_content(prompt)
@@ -395,7 +397,7 @@ async def increment_daily_evaluation_count(user_id: str) -> None:
         pass
 
 
-def process_file(file_content: str, filename: str) -> List[Dict[str, str]]:
+def process_file(file_content, filename: str) -> List[Dict[str, str]]:
     """Process uploaded file and extract question, reference, answer columns"""
     rows = []
 
@@ -429,9 +431,36 @@ def process_file(file_content: str, filename: str) -> List[Dict[str, str]]:
                     continue
 
     elif filename.endswith(".xlsx") or filename.endswith(".xls"):
-        # For Excel files, we'll need to handle this differently
-        # For now, return empty to trigger error
-        pass
+        # Parse Excel files using pandas
+        try:
+            import io
+            # For Excel files, we need to handle binary content differently
+            # We'll need to modify the calling code to handle this properly
+            df = pd.read_excel(io.StringIO(file_content) if isinstance(file_content, str) else io.BytesIO(file_content))
+            
+            # Check if required columns exist
+            required_columns = ["question", "reference", "answer"]
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                print(f"Excel file missing columns: {', '.join(missing_columns)}")
+                return []
+            
+            # Convert to list of dictionaries
+            for _, row in df.iterrows():
+                # Skip rows where all required fields are empty
+                question = str(row.get("question", "")).strip()
+                reference = str(row.get("reference", "")).strip() 
+                answer = str(row.get("answer", "")).strip()
+                
+                if question and reference and answer:  # Only include rows with all fields
+                    rows.append({
+                        "question": question,
+                        "reference": reference,
+                        "answer": answer,
+                    })
+        except Exception as e:
+            print(f"Error processing Excel file: {e}")
+            return []
 
     return rows
 
@@ -459,10 +488,13 @@ async def upload_and_evaluate(
     try:
         # Read file content
         content = await file.read()
-        content_str = content.decode("utf-8")
-
-        # Process file
-        rows = process_file(content_str, file.filename)
+        
+        # Process file - handle Excel files differently (binary) vs text files
+        if file.filename.endswith((".xlsx", ".xls")):
+            rows = process_file(content, file.filename)  # Pass binary content for Excel
+        else:
+            content_str = content.decode("utf-8")
+            rows = process_file(content_str, file.filename)  # Pass text content for CSV/JSONL
 
         if not rows:
             return templates.TemplateResponse(
