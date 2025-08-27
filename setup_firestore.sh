@@ -84,6 +84,14 @@ gcloud firestore indexes fields create \
     --field-config=field-path=requested_at,order=descending \
     --quiet || echo "Index may already exist"
 
+# Index for feedback: server_timestamp (for chronological ordering)
+echo "Creating index: feedback (server_timestamp DESC)"
+gcloud firestore indexes fields create \
+    --database="$DATABASE_NAME" \
+    --collection-group=feedback \
+    --field-config=field-path=server_timestamp,order=descending \
+    --quiet || echo "Index may already exist"
+
 echo -e "${GREEN}✅ Indexes created (may take a few minutes to build)${NC}"
 
 # Set up Firestore security rules
@@ -101,6 +109,9 @@ service cloud.firestore {
       allow read, write: if false;  // Server-side only via service account
     }
     match /waiting_list/{document} {
+      allow read, write: if false;  // Server-side only via service account
+    }
+    match /feedback/{document} {
       allow read, write: if false;  // Server-side only via service account
     }
   }
@@ -132,12 +143,14 @@ echo -e "${YELLOW}📊 Collections that will be created:${NC}"
 echo "   • analytics_events - Stores all user interaction events"
 echo "   • user_metrics - Aggregated metrics per user"
 echo "   • waiting_list - Users waiting for higher limits"
+echo "   • feedback - User feedback and satisfaction ratings"
 echo ""
 echo -e "${YELLOW}🔍 Indexes created for optimal queries:${NC}"
 echo "   • analytics_events: event_type + timestamp"
 echo "   • analytics_events: user_id + timestamp" 
 echo "   • user_metrics: total_evaluations + last_activity"
 echo "   • waiting_list: requested_at (chronological)"
+echo "   • feedback: server_timestamp (chronological)"
 echo ""
 echo -e "${YELLOW}🔒 Security:${NC}"
 echo "   • Collections are server-side only (no client access)"
