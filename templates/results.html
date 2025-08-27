@@ -442,6 +442,93 @@
                 </div>
             </div>
             
+            <!-- Feedback Section -->
+            <div class="row mt-4 g-4">
+                <div class="col-12">
+                    <div class="summary-card">
+                        <h3 class="summary-title">
+                            <i class="fas fa-comment me-2" style="color: #007bff;"></i>
+                            Help Us Improve
+                        </h3>
+                        <p style="color: #666; margin-bottom: 1.5rem;">
+                            Your feedback helps us make EvalNow better. How was your experience?
+                        </p>
+                        
+                        <div id="feedbackForm">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label" style="font-weight: 500;">How satisfied are you with the results?</label>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <input type="radio" class="btn-check" name="satisfaction" id="very-satisfied" value="very-satisfied">
+                                        <label class="btn btn-outline-success btn-sm" for="very-satisfied">😀 Very Satisfied</label>
+                                        
+                                        <input type="radio" class="btn-check" name="satisfaction" id="satisfied" value="satisfied">
+                                        <label class="btn btn-outline-primary btn-sm" for="satisfied">🙂 Satisfied</label>
+                                        
+                                        <input type="radio" class="btn-check" name="satisfaction" id="neutral" value="neutral">
+                                        <label class="btn btn-outline-secondary btn-sm" for="neutral">😐 Neutral</label>
+                                        
+                                        <input type="radio" class="btn-check" name="satisfaction" id="unsatisfied" value="unsatisfied">
+                                        <label class="btn btn-outline-warning btn-sm" for="unsatisfied">🙁 Unsatisfied</label>
+                                        
+                                        <input type="radio" class="btn-check" name="satisfaction" id="very-unsatisfied" value="very-unsatisfied">
+                                        <label class="btn btn-outline-danger btn-sm" for="very-unsatisfied">😞 Very Unsatisfied</label>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label class="form-label" style="font-weight: 500;">Would you recommend EvalNow?</label>
+                                    <div class="d-flex gap-2">
+                                        <input type="radio" class="btn-check" name="recommend" id="recommend-yes" value="yes">
+                                        <label class="btn btn-outline-success btn-sm" for="recommend-yes">👍 Yes</label>
+                                        
+                                        <input type="radio" class="btn-check" name="recommend" id="recommend-maybe" value="maybe">
+                                        <label class="btn btn-outline-secondary btn-sm" for="recommend-maybe">🤔 Maybe</label>
+                                        
+                                        <input type="radio" class="btn-check" name="recommend" id="recommend-no" value="no">
+                                        <label class="btn btn-outline-danger btn-sm" for="recommend-no">👎 No</label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row g-3 mt-3">
+                                <div class="col-12">
+                                    <label for="feedbackComment" class="form-label" style="font-weight: 500;">Additional comments (optional):</label>
+                                    <textarea class="form-control" id="feedbackComment" name="comment" rows="3" 
+                                              placeholder="What did you like? What could we improve? Any suggestions?"></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="row g-3 mt-3">
+                                <div class="col-md-6">
+                                    <button type="button" class="btn btn-primary" id="submitFeedback">
+                                        <i class="fas fa-paper-plane me-2"></i>Submit Feedback
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="feedbackSuccess" style="display: none;">
+                            <div class="alert alert-success d-flex align-items-center">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <div>
+                                    <strong>Thank you!</strong> Your feedback has been submitted and helps us improve EvalNow.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="feedbackError" style="display: none;">
+                            <div class="alert alert-danger d-flex align-items-center">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <div>
+                                    <strong>Oops!</strong> There was an error submitting your feedback. Please try again.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Quick Stats -->
             <div class="row mt-4 g-4">
                 <div class="col-md-8">
@@ -584,6 +671,71 @@
                 output_tokens: {{ insights.output_tokens }}
             });
         }
+        
+        // Handle feedback form submission
+        document.getElementById('submitFeedback').addEventListener('click', function() {
+            const satisfaction = document.querySelector('input[name="satisfaction"]:checked');
+            const recommend = document.querySelector('input[name="recommend"]:checked');
+            const comment = document.getElementById('feedbackComment').value.trim();
+            
+            // Basic validation
+            if (!satisfaction) {
+                alert('Please rate your satisfaction with the results.');
+                return;
+            }
+            
+            const feedbackData = {
+                result_id: "{{ result_id }}",
+                filename: "{{ filename }}",
+                satisfaction: satisfaction.value,
+                recommend: recommend ? recommend.value : null,
+                comment: comment,
+                total_questions: {{ insights.total_questions }},
+                pass_rate: {{ insights.pass_rate }},
+                timestamp: new Date().toISOString()
+            };
+            
+            // Show loading state
+            const button = document.getElementById('submitFeedback');
+            const originalText = button.innerHTML;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Submitting...';
+            button.disabled = true;
+            
+            // Submit feedback
+            fetch('/api/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(feedbackData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('feedbackForm').style.display = 'none';
+                    document.getElementById('feedbackSuccess').style.display = 'block';
+                    
+                    // Track feedback submission
+                    if (window.trackFeedbackSubmitted) {
+                        window.trackFeedbackSubmitted({
+                            satisfaction: satisfaction.value,
+                            recommend: recommend ? recommend.value : null,
+                            has_comment: comment.length > 0
+                        });
+                    }
+                } else {
+                    throw new Error('Submission failed');
+                }
+            })
+            .catch(error => {
+                console.error('Feedback submission error:', error);
+                document.getElementById('feedbackError').style.display = 'block';
+                
+                // Reset button
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        });
     </script>
 </body>
 </html>

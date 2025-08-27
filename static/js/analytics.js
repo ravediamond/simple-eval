@@ -158,3 +158,9 @@ window.trackPdfDownloaded = function(resultId) {
         window.evalNowAnalytics.trackPdfDownloaded(resultId);
     }
 };
+
+window.trackFeedbackSubmitted = function(data) {
+    if (window.evalNowAnalytics) {
+        window.evalNowAnalytics.trackEvent('feedback_submitted', data);
+    }
+};

@@ -354,6 +354,29 @@
                     </div>
                 </div>
             </div>
+
+            <!-- User Feedback Section -->
+            <div class="metrics-section" id="feedback-section">
+                <h2 class="section-title">💬 User Feedback</h2>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="insights-card">
+                            <div class="insights-title">
+                                <i class="fas fa-comment text-primary me-2"></i>
+                                Recent Feedback
+                            </div>
+                            <div id="feedback-container">
+                                <div class="loading-spinner">
+                                    <div>
+                                        <div class="spinner-border me-3" role="status"></div>
+                                        <div>Loading feedback...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -425,6 +448,29 @@
             } catch (error) {
                 console.error('Waitlist error:', error);
                 showWaitlistError('Failed to load waiting list: ' + error.message);
+            }
+        }
+
+        async function loadFeedback() {
+            try {
+                const response = await fetch('/api/feedback');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showFeedbackError(data.error);
+                    return;
+                }
+                
+                displayFeedback(data.feedback || []);
+                
+            } catch (error) {
+                console.error('Feedback error:', error);
+                showFeedbackError('Failed to load feedback: ' + error.message);
             }
         }
 
@@ -713,6 +759,15 @@
             `;
         }
 
+        function showFeedbackError(message) {
+            document.getElementById('feedback-container').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${message}
+                </div>
+            `;
+        }
+
         function displayWaitlist(waitlist) {
             if (!waitlist || waitlist.length === 0) {
                 document.getElementById('waitlist-container').innerHTML = `
@@ -780,6 +835,159 @@
             document.getElementById('waitlist-container').innerHTML = waitlistHtml;
         }
 
+        function displayFeedback(feedback) {
+            if (!feedback || feedback.length === 0) {
+                document.getElementById('feedback-container').innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No feedback received yet.
+                    </div>
+                `;
+                return;
+            }
+
+            // Calculate summary statistics
+            const satisfactionCounts = {
+                'very-satisfied': 0,
+                'satisfied': 0,
+                'neutral': 0,
+                'unsatisfied': 0,
+                'very-unsatisfied': 0
+            };
+
+            const recommendCounts = {
+                'yes': 0,
+                'maybe': 0,
+                'no': 0
+            };
+
+            feedback.forEach(entry => {
+                if (entry.satisfaction && satisfactionCounts.hasOwnProperty(entry.satisfaction)) {
+                    satisfactionCounts[entry.satisfaction]++;
+                }
+                if (entry.recommend && recommendCounts.hasOwnProperty(entry.recommend)) {
+                    recommendCounts[entry.recommend]++;
+                }
+            });
+
+            const totalSatisfied = satisfactionCounts['very-satisfied'] + satisfactionCounts['satisfied'];
+            const satisfactionRate = feedback.length > 0 ? Math.round((totalSatisfied / feedback.length) * 100) : 0;
+            const recommendRate = feedback.length > 0 ? Math.round((recommendCounts['yes'] / feedback.length) * 100) : 0;
+
+            const feedbackHtml = `
+                <div class="mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="text-center p-3" style="background: rgba(248, 249, 250, 0.8); border-radius: 12px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: #1a1a1a;">${feedback.length}</div>
+                                <div style="color: #666; font-size: 0.9rem;">Total Responses</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-3" style="background: rgba(248, 249, 250, 0.8); border-radius: 12px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: #28a745;">${satisfactionRate}%</div>
+                                <div style="color: #666; font-size: 0.9rem;">Satisfaction Rate</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-3" style="background: rgba(248, 249, 250, 0.8); border-radius: 12px;">
+                                <div style="font-size: 2rem; font-weight: 700; color: #007bff;">${recommendRate}%</div>
+                                <div style="color: #666; font-size: 0.9rem;">Would Recommend</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Satisfaction</th>
+                                <th>Recommend</th>
+                                <th>Comment</th>
+                                <th>File Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${feedback.slice(0, 20).map(entry => {
+                                const satisfactionEmoji = {
+                                    'very-satisfied': '😀',
+                                    'satisfied': '🙂',
+                                    'neutral': '😐',
+                                    'unsatisfied': '🙁',
+                                    'very-unsatisfied': '😞'
+                                };
+
+                                const recommendEmoji = {
+                                    'yes': '👍',
+                                    'maybe': '🤔',
+                                    'no': '👎'
+                                };
+
+                                const satisfactionColor = {
+                                    'very-satisfied': 'success',
+                                    'satisfied': 'primary',
+                                    'neutral': 'secondary',
+                                    'unsatisfied': 'warning',
+                                    'very-unsatisfied': 'danger'
+                                };
+
+                                const recommendColor = {
+                                    'yes': 'success',
+                                    'maybe': 'secondary',
+                                    'no': 'danger'
+                                };
+
+                                return `
+                                    <tr>
+                                        <td>
+                                            <small>${new Date(entry.server_timestamp || entry.timestamp).toLocaleDateString()}</small><br>
+                                            <small class="text-muted">${new Date(entry.server_timestamp || entry.timestamp).toLocaleTimeString()}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-${satisfactionColor[entry.satisfaction] || 'secondary'}">
+                                                ${satisfactionEmoji[entry.satisfaction] || '?'} ${entry.satisfaction || 'N/A'}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            ${entry.recommend ? `
+                                                <span class="badge bg-${recommendColor[entry.recommend]}">
+                                                    ${recommendEmoji[entry.recommend]} ${entry.recommend}
+                                                </span>
+                                            ` : '<small class="text-muted">N/A</small>'}
+                                        </td>
+                                        <td>
+                                            ${entry.comment ? `
+                                                <div style="max-width: 300px; max-height: 100px; overflow-y: auto;">
+                                                    <small>${entry.comment}</small>
+                                                </div>
+                                            ` : '<small class="text-muted">No comment</small>'}
+                                        </td>
+                                        <td>
+                                            <small>
+                                                <strong>File:</strong> ${entry.filename || 'Unknown'}<br>
+                                                <strong>Questions:</strong> ${entry.total_questions || 'N/A'}<br>
+                                                <strong>Pass Rate:</strong> ${entry.pass_rate ? Math.round(entry.pass_rate * 100) + '%' : 'N/A'}
+                                            </small>
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+
+                ${feedback.length > 20 ? `
+                    <div class="text-center mt-3">
+                        <small class="text-muted">Showing latest 20 feedback entries (${feedback.length} total)</small>
+                    </div>
+                ` : ''}
+            `;
+
+            document.getElementById('feedback-container').innerHTML = feedbackHtml;
+        }
+
         async function approveEntry(entryId) {
             try {
                 const response = await fetch(`/api/waitlist/${entryId}/approve`, {
@@ -822,12 +1030,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadAnalytics();
             loadWaitlist();
+            loadFeedback();
         });
         
         // Auto-refresh every 30 seconds
         setInterval(function() {
             loadAnalytics();
             loadWaitlist();
+            loadFeedback();
         }, 30000);
     </script>
 </body>

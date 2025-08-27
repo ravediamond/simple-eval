@@ -914,6 +914,87 @@ async def get_kpis(request: Request, credentials: HTTPBasicCredentials = Depends
         )
 
 
+@app.post("/api/feedback")
+async def submit_feedback(request: Request):
+    """Submit user feedback"""
+    try:
+        data = await request.json()
+        
+        # Add server-side timestamp
+        feedback_entry = {
+            **data,
+            "server_timestamp": datetime.utcnow().isoformat(),
+            "feedback_id": str(uuid.uuid4())
+        }
+        
+        # Store in analytics if available
+        if analytics:
+            await analytics.track_event(
+                event_type="feedback_submitted",
+                user_id=data.get("result_id", "anonymous"),
+                data=feedback_entry
+            )
+            
+            # Also store in a dedicated feedback collection
+            try:
+                from google.cloud import firestore
+                # Use the same custom database as analytics
+                database_name = os.getenv("FIRESTORE_DATABASE", "evalnow-db")
+                project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+                db = firestore.Client(project=project_id, database=database_name)
+                doc_ref = db.collection("feedback").document(feedback_entry["feedback_id"])
+                doc_ref.set(feedback_entry)
+            except Exception as e:
+                print(f"Error saving feedback to Firestore: {e}")
+        
+        return {"success": True, "feedback_id": feedback_entry["feedback_id"]}
+        
+    except Exception as e:
+        print(f"Feedback submission error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
+
+
+@app.get("/api/feedback")
+async def get_feedback(request: Request, credentials: HTTPBasicCredentials = Depends(verify_admin)):
+    """Get all feedback - admin only"""
+    try:
+        feedback_list = []
+        
+        if analytics:
+            try:
+                from google.cloud import firestore
+                # Use the same custom database as analytics
+                database_name = os.getenv("FIRESTORE_DATABASE", "evalnow-db")
+                project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+                db = firestore.Client(project=project_id, database=database_name)
+                
+                # Get feedback from the past 30 days
+                from datetime import timedelta
+                cutoff_date = datetime.utcnow() - timedelta(days=30)
+                
+                feedback_ref = db.collection("feedback")
+                query = feedback_ref.where("server_timestamp", ">=", cutoff_date.isoformat()).order_by("server_timestamp", direction=firestore.Query.DESCENDING)
+                
+                for doc in query.stream():
+                    feedback_data = doc.to_dict()
+                    feedback_list.append(feedback_data)
+                    
+            except Exception as e:
+                print(f"Error fetching feedback: {e}")
+                return {"feedback": [], "error": f"Database error: {str(e)}"}
+        
+        return {"feedback": feedback_list, "total": len(feedback_list)}
+        
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+
 @app.get("/analytics", response_class=HTMLResponse)
 async def analytics_dashboard(request: Request, credentials: HTTPBasicCredentials = Depends(verify_admin)):
     """Analytics dashboard - admin only"""
