@@ -36,6 +36,31 @@
             font-weight: 500;
         }
         
+        .language-toggle {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #495057;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            margin-left: 0.25rem;
+        }
+        
+        .language-toggle:hover {
+            background: #e9ecef;
+            color: #495057;
+            text-decoration: none;
+        }
+        
+        .language-toggle.active {
+            background: #ff6b35;
+            color: white;
+            border-color: #ff6b35;
+        }
+        
         .main-content {
             background: white;
             min-height: calc(100vh - 70px);
@@ -222,8 +247,20 @@
                 <img src="/static/public/icon.png" alt="EvalNow" style="width: 30px; height: 30px; margin-right: 0.5rem;">
                 EvalNow
             </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/">New Evaluation</a>
+            <div class="navbar-nav ms-auto d-flex align-items-center">
+                <a class="nav-link" href="/">{{ 'new_evaluation'|t(language) }}</a>
+                <div class="nav-item">
+                    <div class="d-flex gap-1">
+                        <a href="?lang=en" class="language-toggle {% if language != 'fr' %}active{% endif %}" 
+                           onclick="changeLanguage('en')">
+                            🇺🇸 EN
+                        </a>
+                        <a href="?lang=fr" class="language-toggle {% if language == 'fr' %}active{% endif %}"
+                           onclick="changeLanguage('fr')">
+                            🇫🇷 FR
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
@@ -235,16 +272,16 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <h1 class="page-title">
-                            Evaluation Results
+                            {{ 'evaluation_results'|t(language) }}
                         </h1>
                         <p class="text-muted mb-0">File: {{ filename }}</p>
                     </div>
                     <div>
                         <a href="/download-pdf/{{ result_id }}" class="btn btn-success me-2" target="_blank">
-                            <i class="fas fa-download me-2"></i>Download PDF Report
+                            <i class="fas fa-download me-2"></i>{{ 'download_pdf_report'|t(language) }}
                         </a>
                         <a href="/" class="btn btn-outline-primary">
-                            <i class="fas fa-plus me-2"></i>New Evaluation
+                            <i class="fas fa-plus me-2"></i>{{ 'new_evaluation'|t(language) }}
                         </a>
                     </div>
                 </div>
@@ -254,7 +291,7 @@
             <div class="insights-section">
                 <h2 class="insights-title">
                     <i class="fas fa-lightbulb" style="color: #ff6b35;"></i>
-                    Key Insights
+                    {{ 'key_insights'|t(language) }}
                 </h2>
                 
                 <div class="row g-3 mb-4">
@@ -264,7 +301,7 @@
                                 <i class="fas fa-list-ol"></i>
                             </div>
                             <div class="metric-value">{{ insights.total_questions }}</div>
-                            <div class="metric-label">Total Questions</div>
+                            <div class="metric-label">{{ 'total_questions'|t(language) }}</div>
                         </div>
                     </div>
                     
@@ -274,7 +311,7 @@
                                 <i class="fas fa-star"></i>
                             </div>
                             <div class="metric-value">{{ "%.1f" | format(insights.pass_rate * 100) }}%</div>
-                            <div class="metric-label">Pass Rate</div>
+                            <div class="metric-label">{{ 'pass_rate'|t(language) }}</div>
                         </div>
                     </div>
                     
@@ -328,7 +365,7 @@
                 <div class="table-header">
                     <h3 class="table-title">
                         <i class="fas fa-table me-2"></i>
-                        Detailed Results
+                        {{ 'detailed_results'|t(language) }}
                     </h3>
                 </div>
                 <div class="table-responsive">
@@ -336,9 +373,9 @@
                         <thead style="background: #f8f9fa;">
                             <tr>
                                 <th style="width: 5%; padding: 1rem;">#</th>
-                                <th style="width: 35%; padding: 1rem;">Question</th>
-                                <th style="width: 30%; padding: 1rem;">Answer</th>
-                                <th style="width: 15%; padding: 1rem;">Score</th>
+                                <th style="width: 35%; padding: 1rem;">{{ 'question'|t(language) }}</th>
+                                <th style="width: 30%; padding: 1rem;">{{ 'answer'|t(language) }}</th>
+                                <th style="width: 15%; padding: 1rem;">{{ 'score'|t(language) }}</th>
                                 <th style="width: 15%; padding: 1rem;">Actions</th>
                             </tr>
                         </thead>
@@ -363,12 +400,12 @@
                                             <div class="badge score-badge bg-success" style="font-size: 1.2rem; padding: 0.6rem 1.2rem; margin-bottom: 0.5rem; display: block;">
                                                 <i class="fas fa-check me-2"></i>PASS
                                             </div>
-                                            <small class="text-success fw-bold">Correct Answer</small>
+                                            <small class="text-success fw-bold">{{ 'correct_answer'|t(language) }}</small>
                                         {% else %}
                                             <div class="badge score-badge bg-danger" style="font-size: 1.2rem; padding: 0.6rem 1.2rem; margin-bottom: 0.5rem; display: block;">
                                                 <i class="fas fa-times me-2"></i>FAIL
                                             </div>
-                                            <small class="text-danger fw-bold">Incorrect Answer</small>
+                                            <small class="text-danger fw-bold">{{ 'incorrect_answer'|t(language) }}</small>
                                         {% endif %}
                                     </div>
                                 </td>
@@ -393,7 +430,7 @@
                     <div class="summary-card">
                         <h3 class="summary-title">
                             <i class="fas fa-brain me-2" style="color: #ff6b35;"></i>
-                            AI Analysis & Summary
+                            {{ 'ai_analysis_summary'|t(language) }}
                         </h3>
                         <p style="color: #666; line-height: 1.6; font-size: 1.1rem; margin-bottom: 2rem;">
                             {{ insights.ai_analysis.summary }}
@@ -403,13 +440,13 @@
                             <div class="col-md-6">
                                 <h5 style="font-weight: 600; color: #1a1a1a; margin-bottom: 1rem;">
                                     <i class="fas fa-lightbulb me-2" style="color: #ffc107;"></i>
-                                    Key Insights
+                                    {{ 'key_insights'|t(language) }}
                                 </h5>
                                 <ul style="list-style: none; padding: 0;">
                                     {% for insight in insights.ai_analysis.key_insights %}
                                     <li style="margin-bottom: 0.75rem; padding-left: 1.5rem; position: relative;">
                                         <i class="fas fa-check-circle" style="position: absolute; left: 0; top: 0.25rem; color: #28a745;"></i>
-                                        {{ insight }}
+                                        {{ insight | clean_markdown }}
                                     </li>
                                     {% endfor %}
                                 </ul>
@@ -418,13 +455,13 @@
                             <div class="col-md-6">
                                 <h5 style="font-weight: 600; color: #1a1a1a; margin-bottom: 1rem;">
                                     <i class="fas fa-arrow-up me-2" style="color: #007bff;"></i>
-                                    Recommendations
+                                    {{ 'recommendations'|t(language) }}
                                 </h5>
                                 <ul style="list-style: none; padding: 0;">
                                     {% for recommendation in insights.ai_analysis.recommendations %}
                                     <li style="margin-bottom: 0.75rem; padding-left: 1.5rem; position: relative;">
                                         <i class="fas fa-star" style="position: absolute; left: 0; top: 0.25rem; color: #ffc107;"></i>
-                                        {{ recommendation }}
+                                        {{ recommendation | clean_markdown }}
                                     </li>
                                     {% endfor %}
                                 </ul>
@@ -448,16 +485,16 @@
                     <div class="summary-card">
                         <h3 class="summary-title">
                             <i class="fas fa-comment me-2" style="color: #007bff;"></i>
-                            Help Us Improve
+                            {{ 'help_us_improve'|t(language) }}
                         </h3>
                         <p style="color: #666; margin-bottom: 1.5rem;">
-                            Your feedback helps us make EvalNow better. How was your experience?
+                            {{ 'feedback_description'|t(language) }}
                         </p>
                         
                         <div id="feedbackForm">
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label" style="font-weight: 500;">How satisfied are you with the results?</label>
+                                    <label class="form-label" style="font-weight: 500;">{{ 'satisfaction_question'|t(language) }}</label>
                                     <div class="d-flex gap-2 flex-wrap">
                                         <input type="radio" class="btn-check" name="satisfaction" id="very-satisfied" value="very-satisfied">
                                         <label class="btn btn-outline-success btn-sm" for="very-satisfied">😀 Very Satisfied</label>
@@ -477,7 +514,7 @@
                                 </div>
                                 
                                 <div class="col-md-6">
-                                    <label class="form-label" style="font-weight: 500;">Would you recommend EvalNow?</label>
+                                    <label class="form-label" style="font-weight: 500;">{{ 'would_recommend'|t(language) }}</label>
                                     <div class="d-flex gap-2">
                                         <input type="radio" class="btn-check" name="recommend" id="recommend-yes" value="yes">
                                         <label class="btn btn-outline-success btn-sm" for="recommend-yes">👍 Yes</label>
@@ -493,7 +530,7 @@
                             
                             <div class="row g-3 mt-3">
                                 <div class="col-12">
-                                    <label for="feedbackComment" class="form-label" style="font-weight: 500;">Additional comments (optional):</label>
+                                    <label for="feedbackComment" class="form-label" style="font-weight: 500;">{{ 'additional_comments'|t(language) }}</label>
                                     <textarea class="form-control" id="feedbackComment" name="comment" rows="3" 
                                               placeholder="What did you like? What could we improve? Any suggestions?"></textarea>
                                 </div>
@@ -502,7 +539,7 @@
                             <div class="row g-3 mt-3">
                                 <div class="col-md-6">
                                     <button type="button" class="btn btn-primary" id="submitFeedback">
-                                        <i class="fas fa-paper-plane me-2"></i>Submit Feedback
+                                        <i class="fas fa-paper-plane me-2"></i>{{ 'submit_feedback'|t(language) }}
                                     </button>
                                 </div>
                             </div>
@@ -535,25 +572,25 @@
                     <div class="summary-card">
                         <h3 class="summary-title">
                             <i class="fas fa-clipboard-check me-2"></i>
-                            Quick Statistics
+                            {{ 'quick_statistics'|t(language) }}
                         </h3>
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
                                     <div style="font-size: 2rem; font-weight: 700; color: #1a1a1a;">{{ insights.total_questions }}</div>
-                                    <div style="color: #666; font-size: 0.9rem;">Total Questions</div>
+                                    <div style="color: #666; font-size: 0.9rem;">{{ 'total_questions'|t(language) }}</div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
                                     <div style="font-size: 2rem; font-weight: 700; color: #1a1a1a;">{{ "%.1f" | format(insights.pass_rate * 100) }}%</div>
-                                    <div style="color: #666; font-size: 0.9rem;">Pass Rate</div>
+                                    <div style="color: #666; font-size: 0.9rem;">{{ 'pass_rate'|t(language) }}</div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div style="text-align: center; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
                                     <div style="font-size: 2rem; font-weight: 700; color: #1a1a1a;">{{ "%.1f" | format(insights.pass_rate * 100) }}%</div>
-                                    <div style="color: #666; font-size: 0.9rem;">Pass Rate (≥70%)</div>
+                                    <div style="color: #666; font-size: 0.9rem;">{{ 'pass_rate'|t(language) }} (≥70%)</div>
                                 </div>
                             </div>
                         </div>
@@ -563,13 +600,13 @@
                     <div class="summary-card">
                         <h3 class="summary-title">
                             <i class="fas fa-info-circle me-2"></i>
-                            About This Evaluation
+                            {{ 'about_evaluation'|t(language) }}
                         </h3>
                         <ul class="list-unstyled mb-0" style="line-height: 1.8;">
-                            <li><i class="fas fa-check text-success me-2"></i>No data stored</li>
-                            <li><i class="fas fa-check text-success me-2"></i>AI-powered scoring</li>
-                            <li><i class="fas fa-check text-success me-2"></i>Real-time evaluation</li>
-                            <li><i class="fas fa-check text-success me-2"></i>Detailed feedback</li>
+                            <li><i class="fas fa-check text-success me-2"></i>{{ 'no_data_stored'|t(language) }}</li>
+                            <li><i class="fas fa-check text-success me-2"></i>{{ 'ai_powered_scoring'|t(language) }}</li>
+                            <li><i class="fas fa-check text-success me-2"></i>{{ 'real_time_evaluation'|t(language) }}</li>
+                            <li><i class="fas fa-check text-success me-2"></i>{{ 'detailed_feedback'|t(language) }}</li>
                         </ul>
                     </div>
                 </div>
@@ -736,6 +773,14 @@
                 button.disabled = false;
             });
         });
+        
+        // Language switching function
+        function changeLanguage(lang) {
+            const url = new URL(window.location);
+            url.searchParams.set('lang', lang);
+            window.location.href = url.toString();
+            return false;
+        }
     </script>
 </body>
 </html>

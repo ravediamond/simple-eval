@@ -5,7 +5,8 @@ import csv
 import pandas as pd
 import io
 import uuid
-from typing import List, Dict, Any
+import re
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -71,6 +72,84 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Templates
 templates = Jinja2Templates(directory="templates")
 
+# Add custom filter for cleaning markdown
+def clean_markdown_filter(text):
+    """Clean markdown formatting from text"""
+    import re
+    if not text:
+        return text
+    # Remove **bold** formatting and keep the text
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    # Remove *italic* formatting
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = text.strip()
+    return text
+
+templates.env.filters['clean_markdown'] = clean_markdown_filter
+
+# Translation system - Load translations from JSON files
+TRANSLATIONS = {}
+
+def load_translations():
+    """Load translation files from the translations directory"""
+    global TRANSLATIONS
+    
+    translation_dir = os.path.join(os.path.dirname(__file__), '..', 'translations')
+    
+    for lang_code in ['en', 'fr']:
+        file_path = os.path.join(translation_dir, f'{lang_code}.json')
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                TRANSLATIONS[lang_code] = json.load(f)
+        except FileNotFoundError:
+            print(f"Warning: Translation file {file_path} not found")
+            TRANSLATIONS[lang_code] = {}
+        except json.JSONDecodeError as e:
+            print(f"Error loading translation file {file_path}: {e}")
+            TRANSLATIONS[lang_code] = {}
+
+# Load translations on startup
+load_translations()
+
+def detect_language(request: Request) -> str:
+    """Detect user language from Accept-Language header or URL param"""
+    # Check URL parameter first (manual override)
+    if hasattr(request, 'query_params') and 'lang' in request.query_params:
+        lang = request.query_params['lang'].lower()
+        if lang in ['fr', 'french']:
+            return 'fr'
+        else:
+            return 'en'
+    
+    # Check Accept-Language header
+    accept_language = request.headers.get('accept-language', '')
+    if accept_language:
+        # Parse accept-language header
+        languages = []
+        for lang_part in accept_language.split(','):
+            if ';' in lang_part:
+                lang = lang_part.split(';')[0].strip()
+            else:
+                lang = lang_part.strip()
+            languages.append(lang.lower())
+        
+        # Check if French is preferred
+        for lang in languages:
+            if lang.startswith('fr'):
+                return 'fr'
+    
+    return 'en'  # Default to English
+
+def get_translation(key: str, language: str = 'en') -> str:
+    """Get translated text for a key"""
+    return TRANSLATIONS.get(language, {}).get(key, TRANSLATIONS['en'].get(key, key))
+
+# Add translation filter to Jinja2
+def translate_filter(key, language='en'):
+    return get_translation(key, language)
+
+templates.env.filters['t'] = translate_filter
+
 # Configure Gemini (AI Vertex default)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_JUDGE_MODEL = os.getenv("GEMINI_JUDGE_MODEL", "gemini-2.5-flash-lite")
@@ -98,7 +177,7 @@ class SimpleEvaluator:
         self.judge_model = genai.GenerativeModel(GEMINI_JUDGE_MODEL) if GEMINI_API_KEY else None
         self.analysis_model = genai.GenerativeModel(GEMINI_ANALYSIS_MODEL) if GEMINI_API_KEY else None
 
-    async def generate_summary_insights(self, results: List[EvaluationResult], filename: str) -> Dict[str, str]:
+    async def generate_summary_insights(self, results: List[EvaluationResult], filename: str, language: str = 'en') -> Dict[str, str]:
         """Generate intelligent summary and insights from all evaluation results"""
         if not self.analysis_model:
             return {
@@ -131,8 +210,42 @@ AI Judgment: {result.reasoning}
         average_score = sum(r.score for r in results) / total_questions if total_questions > 0 else 0
         pass_rate = sum(1 for r in results if r.score >= 0.7) / total_questions if total_questions > 0 else 0
         
-        # Create comprehensive prompt for analysis
-        analysis_prompt = f"""You are a business consultant helping a product manager understand their chatbot's performance for their stakeholders and team.
+        # Create language-specific prompts
+        if language == 'fr':
+            analysis_prompt = f"""Vous êtes un consultant en affaires aidant un chef de produit à comprendre les performances de leur chatbot pour leurs parties prenantes et leur équipe.
+
+RAPPORT DE PERFORMANCE DU CHATBOT:
+- Fichier Analysé: {filename}
+- Questions Testées: {total_questions}
+- Taux de Réussite: {average_score:.1%}
+- Taux de Satisfaction Client: {pass_rate:.1%} (réponses qui satisferaient les clients)
+
+INTERACTIONS CLIENT DÉTAILLÉES:
+{''.join(evaluation_data)}
+
+Veuillez fournir une réponse JSON avec des insights de résumé exécutif:
+{{
+    "summary": "Écrivez 2-3 phrases expliquant à quel point ce chatbot sert bien les clients, dans un langage qu'un PDG comprendrait",
+    "key_insights": [
+        "Listez 3-5 insights sur ce que le chatbot fait bien ou avec quoi il a des difficultés",
+        "Concentrez-vous sur l'impact client: 'Les clients obtiennent des réponses utiles pour X mais ont des difficultés avec Y'",
+        "Utilisez des termes commerciaux, pas de jargon technique"
+    ],
+    "recommendations": [
+        "Listez 3-5 actions spécifiques que l'équipe produit devrait entreprendre",
+        "Concentrez-vous sur l'impact commercial: 'Améliorez X pour réduire la frustration client' ou 'Formez sur Y pour augmenter la satisfaction'"
+    ]
+}}
+
+Pensez comme un consultant en affaires répondant à:
+• Les clients obtiennent-ils l'aide dont ils ont besoin?
+• Quels patterns frustreraient ou raviraient les clients?
+• Sur quoi l'équipe produit devrait-elle se concentrer pour améliorer l'expérience client?
+• Comment pouvons-nous rendre ce chatbot plus précieux pour l'entreprise?
+
+IMPORTANT: Répondez entièrement en français."""
+        else:
+            analysis_prompt = f"""You are a business consultant helping a product manager understand their chatbot's performance for their stakeholders and team.
 
 CHATBOT PERFORMANCE REPORT:
 - File Analyzed: {filename}
@@ -308,25 +421,31 @@ def get_user_id(request: Request) -> str:
     """Get user ID based on IP address and user agent for rate limiting"""
     client_ip = request.client.host
     user_agent = request.headers.get("user-agent", "")
+    
+    # Include additional headers to better differentiate sessions
+    # This helps distinguish between regular and incognito sessions
+    sec_fetch_site = request.headers.get("sec-fetch-site", "")
+    accept_language = request.headers.get("accept-language", "")
+    
     # Simple hash to create consistent user ID
     import hashlib
-    user_string = f"{client_ip}:{user_agent}"
+    user_string = f"{client_ip}:{user_agent}:{sec_fetch_site}:{accept_language}"
     return hashlib.md5(user_string.encode()).hexdigest()[:16]
 
 
-async def check_daily_evaluation_limit(user_id: str) -> bool:
-    """Check if user has exceeded daily evaluation limit (3 per day)"""
-    from datetime import datetime, timezone, timedelta
+async def get_current_daily_evaluations(user_id: str) -> int:
+    """Get current daily evaluation count for user"""
+    from datetime import datetime, timezone
     
     if not analytics or not analytics.db:
-        return True  # Allow if analytics disabled
+        return 0
     
     try:
         user_ref = analytics.db.collection('user_metrics').document(user_id)
         user_doc = user_ref.get()
         
         if not user_doc.exists:
-            return True  # New user, allow
+            return 0  # New user
         
         user_data = user_doc.to_dict()
         last_activity = user_data.get('last_activity')
@@ -340,15 +459,19 @@ async def check_daily_evaluation_limit(user_id: str) -> bool:
             now = datetime.now(timezone.utc)
             if last_activity.date() < now.date():
                 # Reset daily count for new day
-                daily_evaluations = 0
-        else:
-            daily_evaluations = 0
+                return 0
         
-        return daily_evaluations < 3
+        return daily_evaluations
         
     except Exception as e:
-        # Allow on error to avoid blocking users
-        return True
+        # Return 0 on error to avoid blocking users
+        return 0
+
+
+async def check_daily_evaluation_limit(user_id: str) -> bool:
+    """Check if user has exceeded daily evaluation limit (3 per day)"""
+    current_count = await get_current_daily_evaluations(user_id)
+    return current_count < 3
 
 
 async def increment_daily_evaluation_count(user_id: str) -> None:
@@ -362,21 +485,12 @@ async def increment_daily_evaluation_count(user_id: str) -> None:
         user_ref = analytics.db.collection('user_metrics').document(user_id)
         user_doc = user_ref.get()
         
+        # Get current count using consistent logic
+        current_count = await get_current_daily_evaluations(user_id)
+        
         if user_doc.exists:
             user_data = user_doc.to_dict()
-            last_activity = user_data.get('last_activity')
-            daily_evaluations = user_data.get('daily_evaluations', 0)
-            
-            # Reset daily count if last activity was yesterday or earlier
-            if last_activity:
-                if isinstance(last_activity, str):
-                    last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
-                
-                now = datetime.now(timezone.utc)
-                if last_activity.date() < now.date():
-                    daily_evaluations = 0
-            
-            user_data['daily_evaluations'] = daily_evaluations + 1
+            user_data['daily_evaluations'] = current_count + 1
             user_data['last_activity'] = datetime.now(timezone.utc)
             user_ref.set(user_data)
         else:
@@ -468,7 +582,11 @@ def process_file(file_content, filename: str) -> List[Dict[str, str]]:
 @app.get("/", response_class=HTMLResponse)
 async def landing_page(request: Request):
     """Landing page with upload widget"""
-    return templates.TemplateResponse("landing.html", {"request": request})
+    language = detect_language(request)
+    return templates.TemplateResponse("landing.html", {
+        "request": request, 
+        "language": language
+    })
 
 
 @app.post("/evaluation")
@@ -565,8 +683,11 @@ async def upload_and_evaluate(
             )
             results.append(result)
 
+        # Detect language for AI analysis
+        language = detect_language(request)
+        
         # Generate AI-powered summary and insights
-        ai_analysis = await evaluator.generate_summary_insights(results, file.filename)
+        ai_analysis = await evaluator.generate_summary_insights(results, file.filename, language)
 
         # Calculate key insights
         total_questions = len(results)
@@ -630,9 +751,11 @@ async def upload_and_evaluate(
             "results": results,
             "insights": insights,
             "filename": file.filename,
-            "evaluation_time": evaluation_time
+            "evaluation_time": evaluation_time,
+            "language": language
         }
 
+        
         return templates.TemplateResponse(
             "results.html",
             {
@@ -642,6 +765,7 @@ async def upload_and_evaluate(
                 "filename": file.filename,
                 "evaluation_time": evaluation_time,
                 "result_id": result_id,
+                "language": language,
             },
         )
 
@@ -673,13 +797,17 @@ async def download_pdf(result_id: str, request: Request, user_id: str = None):
     cached_data = results_cache[result_id]
     
     try:
+        # Use cached language or detect as fallback
+        language = cached_data.get("language", detect_language(request))
+        
         # Generate PDF
         pdf_generator = EvaluationPDFGenerator()
         pdf_buffer = pdf_generator.generate_pdf(
             results=cached_data["results"],
             insights=cached_data["insights"],
             filename=cached_data["filename"],
-            evaluation_time=cached_data["evaluation_time"]
+            evaluation_time=cached_data["evaluation_time"],
+            language=language
         )
         
         # Track PDF download analytics
