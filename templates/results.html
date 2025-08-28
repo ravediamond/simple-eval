@@ -409,7 +409,7 @@
                                     {% for insight in insights.ai_analysis.key_insights %}
                                     <li style="margin-bottom: 0.75rem; padding-left: 1.5rem; position: relative;">
                                         <i class="fas fa-check-circle" style="position: absolute; left: 0; top: 0.25rem; color: #28a745;"></i>
-                                        {{ insight }}
+                                        {{ insight | clean_markdown }}
                                     </li>
                                     {% endfor %}
                                 </ul>
@@ -424,7 +424,7 @@
                                     {% for recommendation in insights.ai_analysis.recommendations %}
                                     <li style="margin-bottom: 0.75rem; padding-left: 1.5rem; position: relative;">
                                         <i class="fas fa-star" style="position: absolute; left: 0; top: 0.25rem; color: #ffc107;"></i>
-                                        {{ recommendation }}
+                                        {{ recommendation | clean_markdown }}
                                     </li>
                                     {% endfor %}
                                 </ul>

@@ -71,6 +71,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Templates
 templates = Jinja2Templates(directory="templates")
 
+# Add custom filter for cleaning markdown
+def clean_markdown_filter(text):
+    """Clean markdown formatting from text"""
+    import re
+    if not text:
+        return text
+    # Remove **bold** formatting and keep the text
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    # Remove *italic* formatting
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = text.strip()
+    return text
+
+templates.env.filters['clean_markdown'] = clean_markdown_filter
+
 # Configure Gemini (AI Vertex default)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_JUDGE_MODEL = os.getenv("GEMINI_JUDGE_MODEL", "gemini-2.5-flash-lite")

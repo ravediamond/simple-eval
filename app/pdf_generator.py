@@ -17,6 +17,16 @@ class EvaluationPDFGenerator:
         self.styles = getSampleStyleSheet()
         self.setup_custom_styles()
         
+    def clean_markdown_text(self, text: str) -> str:
+        """Clean markdown formatting from text for PDF rendering"""
+        import re
+        # Remove **bold** formatting and keep the text
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        # Remove other common markdown patterns
+        text = re.sub(r'\*(.*?)\*', r'\1', text)  # *italic*
+        text = text.strip()
+        return text
+    
     def setup_custom_styles(self):
         # Custom styles for the PDF
         self.styles.add(ParagraphStyle(
@@ -100,7 +110,18 @@ class EvaluationPDFGenerator:
     def generate_pdf(self, results: List[Any], insights: Dict[str, Any], filename: str, evaluation_time: str) -> io.BytesIO:
         """Generate a comprehensive PDF report"""
         buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=18)
+        doc = SimpleDocTemplate(
+            buffer, 
+            pagesize=A4, 
+            rightMargin=72, 
+            leftMargin=72, 
+            topMargin=72, 
+            bottomMargin=18,
+            title="EvalNow - AI Response Evaluation Report",
+            author="EvalNow",
+            subject=f"AI Evaluation Report for {filename}",
+            creator="EvalNow - evalnow.xyz"
+        )
         
         story = []
         
@@ -178,13 +199,15 @@ class EvaluationPDFGenerator:
             # Key Insights
             story.append(Paragraph("💡 Key Insights", self.styles['Heading3']))
             for insight in ai_analysis.get('key_insights', []):
-                story.append(Paragraph(f"• {insight}", self.styles['InsightText']))
+                cleaned_insight = self.clean_markdown_text(insight)
+                story.append(Paragraph(f"• {cleaned_insight}", self.styles['InsightText']))
             story.append(Spacer(1, 15))
             
             # Recommendations
             story.append(Paragraph("🎯 Recommendations", self.styles['Heading3']))
             for recommendation in ai_analysis.get('recommendations', []):
-                story.append(Paragraph(f"• {recommendation}", self.styles['InsightText']))
+                cleaned_recommendation = self.clean_markdown_text(recommendation)
+                story.append(Paragraph(f"• {cleaned_recommendation}", self.styles['InsightText']))
             story.append(Spacer(1, 20))
         
         # Detailed Results Table (Top 10 or all if <= 10)
