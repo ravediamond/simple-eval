@@ -30,6 +30,30 @@
             font-size: 1.5rem;
         }
         
+        .language-toggle {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #495057;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        
+        .language-toggle:hover {
+            background: #e9ecef;
+            color: #495057;
+            text-decoration: none;
+        }
+        
+        .language-toggle.active {
+            background: #ff6b35;
+            color: white;
+            border-color: #ff6b35;
+        }
+        
         .hero-section {
             background: white;
             padding: 5rem 0 3rem 0;
@@ -221,6 +245,18 @@
                 <img src="/static/public/icon.png" alt="EvalNow" style="width: 32px; height: 32px; margin-right: 0.75rem;">
                 EvalNow
             </a>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item">
+                    <div class="d-flex gap-1">
+                        <a href="?lang=en" class="language-toggle {% if language != 'fr' %}active{% endif %}">
+                            🇺🇸 EN
+                        </a>
+                        <a href="?lang=fr" class="language-toggle {% if language == 'fr' %}active{% endif %}">
+                            🇫🇷 FR
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -230,17 +266,17 @@
             <div class="row align-items-center">
                 <div class="col-lg-7">
                     <h1 class="hero-title">
-                        Know if your AI chatbot works — in minutes.
+                        {{ 'hero_title'|t(language) }}
                     </h1>
                     <p class="hero-subtitle">
-                        Upload your conversations. Get a score, plain-English feedback, and a shareable report. No technical setup, no code.
+                        {{ 'hero_subtitle'|t(language) }}
                     </p>
                     <div style="margin-bottom: 2rem;">
                         <a href="#upload" class="cta-button">
-                            Upload & Evaluate Free
+                            {{ 'upload_button'|t(language) }}
                         </a>
                         <a href="/waitlist" class="cta-button" style="background: linear-gradient(45deg, #ffc107, #ff8c00); margin-left: 1rem;">
-                            <i class="fas fa-star me-2"></i>Join Waiting List
+                            <i class="fas fa-star me-2"></i>{{ 'join_waiting_list'|t(language) }}
                         </a>
                     </div>
                     
@@ -250,11 +286,10 @@
                             <div class="col-md-8">
                                 <h6 style="color: #333; font-weight: 600; margin-bottom: 0.5rem;">
                                     <i class="fas fa-clock me-2" style="color: #ffc107;"></i>
-                                    Currently in Beta
+                                    {{ 'currently_in_beta'|t(language) }}
                                 </h6>
                                 <small style="color: #666; line-height: 1.4;">
-                                    Free access with 50 questions/file and 3 evaluations/day. 
-                                    <strong>Join our waiting list</strong> for higher limits, priority support, and enterprise features.
+                                    {{ 'beta_description'|t(language) }}
                                 </small>
                             </div>
                             <div class="col-md-4 text-md-end mt-2 mt-md-0">
@@ -267,7 +302,7 @@
                     
                     <div class="privacy-badge">
                         <i class="fas fa-shield-alt"></i>
-                        Your data stays private and is automatically deleted after evaluation
+                        {{ 'privacy_notice'|t(language) }}
                     </div>
                 </div>
                 <div class="col-lg-5">
@@ -284,10 +319,10 @@
         <div class="container">
             <div class="row justify-content-center">
                 <div class="col-lg-8">
-                    <h2 class="section-title">Try it free — upload your chatbot's answers today</h2>
+                    <h2 class="section-title">{{ 'try_free_title'|t(language) }}</h2>
                     <p class="section-subtitle">
-                        Upload a CSV, Excel, or JSONL file with three columns: 
-                        <strong>question</strong>, <strong>reference</strong>, and <strong>answer</strong>
+                        {{ 'upload_instruction'|t(language) }}
+                        <strong>{{ 'column_question'|t(language) }}</strong>, <strong>{{ 'column_reference'|t(language) }}</strong>, {{ 'and'|t(language)|default('and') }} <strong>{{ 'column_answer'|t(language) }}</strong>
                     </p>
                     
                     <!-- Usage Limits Notice -->
@@ -297,19 +332,15 @@
                                 <i class="fas fa-info-circle" style="color: #0c5460; font-size: 1.2rem; margin-top: 2px;"></i>
                             </div>
                             <div style="flex: 1;">
-                                <h6 style="color: #0c5460; font-weight: 600; margin-bottom: 0.5rem;">Current Usage Limits</h6>
+                                <h6 style="color: #0c5460; font-weight: 600; margin-bottom: 0.5rem;">{{ 'usage_limits_title'|t(language) }}</h6>
                                 <ul style="color: #0c5460; margin-bottom: 1rem; padding-left: 1rem;">
-                                    <li><strong>50 questions maximum</strong> per file</li>
-                                    <li><strong>3 evaluations per day</strong> per user</li>
+                                    <li>{{ 'limit_questions'|t(language) }}</li>
+                                    <li>{{ 'limit_evaluations'|t(language) }}</li>
                                 </ul>
                                 <div style="color: #0c5460;">
                                     <small>
                                         <i class="fas fa-star me-1"></i>
-                                        Need higher limits? 
-                                        <a href="/waitlist" style="color: #0c5460; font-weight: 600; text-decoration: none;">
-                                            Join our waiting list
-                                        </a> 
-                                        for higher limits and priority features
+                                        {{ 'higher_limits'|t(language) }}
                                     </small>
                                 </div>
                             </div>
@@ -336,19 +367,19 @@
                                     <i class="fas fa-cloud-upload-alt"></i>
                                 </div>
                                 <h4 style="font-weight: 600; margin-bottom: 1rem; color: #1a1a1a;">
-                                    Drag & drop your file here
+                                    {{ 'drag_drop'|t(language) }}
                                 </h4>
                                 <p style="color: #666; margin-bottom: 1.5rem;">
-                                    or click to browse
+                                    {{ 'or_click'|t(language) }}
                                 </p>
                                 <input type="file" class="form-control d-none" id="file" name="file" 
                                        accept=".csv,.jsonl,.xlsx,.xls" required>
                                 <button type="button" class="btn-file" onclick="document.getElementById('file').click()">
-                                    Choose File
+                                    {{ 'choose_file'|t(language) }}
                                 </button>
                                 <div style="margin-top: 1rem;">
                                     <small style="color: #999;">
-                                        Supported formats: CSV, JSONL, Excel (.xlsx, .xls)
+                                        {{ 'supported_formats'|t(language) }}
                                     </small>
                                 </div>
                             </div>
@@ -372,28 +403,28 @@
 
                     <!-- File Format Examples -->
                     <div class="file-format-example">
-                        <h6 style="font-weight: 600; margin-bottom: 1rem; color: #1a1a1a;">Expected File Format:</h6>
+                        <h6 style="font-weight: 600; margin-bottom: 1rem; color: #1a1a1a;">{{ 'expected_file_format'|t(language) }}</h6>
                         <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
-                            Your file should have these three columns:
+                            {{ 'file_format_description'|t(language) }}
                         </p>
                         <table class="table table-sm" style="margin-bottom: 0;">
                             <thead style="background: #f8f9fa;">
                                 <tr>
-                                    <th style="font-weight: 600; color: #1a1a1a;">question</th>
-                                    <th style="font-weight: 600; color: #1a1a1a;">reference</th>
-                                    <th style="font-weight: 600; color: #1a1a1a;">answer</th>
+                                    <th style="font-weight: 600; color: #1a1a1a;">{{ 'column_question'|t(language) }}</th>
+                                    <th style="font-weight: 600; color: #1a1a1a;">{{ 'column_reference'|t(language) }}</th>
+                                    <th style="font-weight: 600; color: #1a1a1a;">{{ 'column_answer'|t(language) }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td style="color: #666;">What is 2+2?</td>
-                                    <td style="color: #666;">Four</td>
-                                    <td style="color: #666;">2+2 equals 4</td>
+                                    <td style="color: #666;">{{ 'example_question'|t(language) }}</td>
+                                    <td style="color: #666;">{{ 'example_reference'|t(language) }}</td>
+                                    <td style="color: #666;">{{ 'example_answer'|t(language) }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="color: #666;">Capital of France?</td>
-                                    <td style="color: #666;">Paris</td>
-                                    <td style="color: #666;">The capital city of France is Paris</td>
+                                    <td style="color: #666;">{{ 'example_question_2'|t(language) }}</td>
+                                    <td style="color: #666;">{{ 'example_reference_2'|t(language) }}</td>
+                                    <td style="color: #666;">{{ 'example_answer_2'|t(language) }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -406,9 +437,9 @@
     <!-- Problem Section -->
     <section id="problem" style="background: #fafafa; padding: 5rem 0;">
         <div class="container">
-            <h2 class="section-title">Your chatbot talks a lot. But is it actually helping?</h2>
+            <h2 class="section-title">{{ 'main_problem'|t(language) }}</h2>
             <p class="section-subtitle">
-                Getting clear answers about your chatbot's performance shouldn't be this hard
+                {{ 'problem_subtitle'|t(language) }}
             </p>
             
             <div class="feature-grid">
@@ -416,9 +447,9 @@
                     <div class="feature-icon">
                         <i class="fas fa-search"></i>
                     </div>
-                    <h5 style="font-weight: 600; margin-bottom: 1rem; color: #1a1a1a;">Hard to judge by scrolling through transcripts</h5>
+                    <h5 style="font-weight: 600; margin-bottom: 1rem; color: #1a1a1a;">{{ 'problem_1_title'|t(language) }}</h5>
                     <p style="color: #666; line-height: 1.6;">
-                        Reading through hundreds of conversations manually is time-consuming and you miss patterns that matter.
+                        {{ 'problem_1_description'|t(language) }}
                     </p>
                 </div>
                 
@@ -426,9 +457,9 @@
                     <div class="feature-icon">
                         <i class="fas fa-cogs"></i>
                     </div>
-                    <h5 style="font-weight: 600; margin-bottom: 1rem; color: #1a1a1a;">Technical eval tools are overwhelming</h5>
+                    <h5 style="font-weight: 600; margin-bottom: 1rem; color: #1a1a1a;">{{ 'problem_2_title'|t(language) }}</h5>
                     <p style="color: #666; line-height: 1.6;">
-                        Complex dashboards and metrics that require a data science degree to understand. You need clarity, not confusion.
+                        {{ 'problem_2_description'|t(language) }}
                     </p>
                 </div>
                 
@@ -450,12 +481,12 @@
         <div class="container">
             <div class="row justify-content-center">
                 <div class="col-lg-10">
-                    <h2 class="section-title">EvalNow makes chatbot evaluation simple:</h2>
+                    <h2 class="section-title">{{ 'solution_title'|t(language) }}</h2>
                     <div style="max-width: 800px; margin: 0 auto 3rem;">
                         <div style="display: flex; align-items: flex-start; margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 12px;">
                             <div style="background: #ff6b35; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 1.5rem; flex-shrink: 0;">1</div>
                             <div>
-                                <h5 style="margin-bottom: 0.5rem; color: #1a1a1a; font-weight: 600;">Upload your conversations in a file (CSV, Excel, JSON).</h5>
+                                <h5 style="margin-bottom: 0.5rem; color: #1a1a1a; font-weight: 600;">{{ 'solution_step_1'|t(language) }}</h5>
                                 <p style="color: #666; margin: 0; line-height: 1.5;">Just drag and drop your file with questions and answers. No complex setup required.</p>
                             </div>
                         </div>
@@ -463,7 +494,7 @@
                         <div style="display: flex; align-items: flex-start; margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 12px;">
                             <div style="background: #ff6b35; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 1.5rem; flex-shrink: 0;">2</div>
                             <div>
-                                <h5 style="margin-bottom: 0.5rem; color: #1a1a1a; font-weight: 600;">Our AI reviews every response like a smart, unbiased critic.</h5>
+                                <h5 style="margin-bottom: 0.5rem; color: #1a1a1a; font-weight: 600;">{{ 'ai_review_description'|t(language) }}</h5>
                                 <p style="color: #666; margin: 0; line-height: 1.5;">We use AI itself to review your chatbot's answers. Think of it like a smart critic that spots what people would notice.</p>
                             </div>
                         </div>
@@ -471,12 +502,12 @@
                         <div style="display: flex; align-items: flex-start; margin-bottom: 2rem; padding: 1.5rem; background: #f8f9fa; border-radius: 12px;">
                             <div style="background: #ff6b35; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 1.5rem; flex-shrink: 0;">3</div>
                             <div>
-                                <h5 style="margin-bottom: 0.5rem; color: #1a1a1a; font-weight: 600;">You get:</h5>
+                                <h5 style="margin-bottom: 0.5rem; color: #1a1a1a; font-weight: 600;">{{ 'you_get'|t(language) }}</h5>
                                 <ul style="color: #666; margin: 0.5rem 0 0 0; line-height: 1.6;">
-                                    <li><strong>An overall score</strong></li>
-                                    <li><strong>A clear explanation of strengths and weaknesses</strong></li>
-                                    <li><strong>Practical advice on what to improve</strong></li>
-                                    <li><strong>A polished PDF report to share with your team</strong></li>
+                                    <li><strong>{{ 'result_overall_score'|t(language) }}</strong></li>
+                                    <li><strong>{{ 'result_explanation'|t(language) }}</strong></li>
+                                    <li><strong>{{ 'result_advice'|t(language) }}</strong></li>
+                                    <li><strong>{{ 'result_pdf_report'|t(language) }}</strong></li>
                                 </ul>
                             </div>
                         </div>
@@ -484,7 +515,7 @@
                     
                     <!-- Example Output Preview -->
                     <div style="text-align: center; margin: 3rem 0;">
-                        <h4 style="color: #1a1a1a; font-weight: 600; margin-bottom: 1rem;">Here's what your results look like:</h4>
+                        <h4 style="color: #1a1a1a; font-weight: 600; margin-bottom: 1rem;">{{ 'results_look_like'|t(language) }}</h4>
                         <div style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #eee; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
                             <img src="/static/public/example-output.png" alt="Example evaluation results showing overall score, individual question analysis, and AI insights" style="max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #ddd;">
                         </div>
@@ -501,7 +532,7 @@
     <section style="background: #fafafa; padding: 4rem 0;">
         <div class="container">
             <div class="text-center mb-4">
-                <h2 class="section-title">Perfect for:</h2>
+                <h2 class="section-title">{{ 'perfect_for'|t(language) }}</h2>
             </div>
             <div class="row">
                 <div class="col-lg-4 mb-4">
@@ -546,25 +577,24 @@
         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; background: white; padding: 3rem; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 500px;">
             <div style="width: 60px; height: 60px; border: 4px solid #f3f3f3; border-top: 4px solid #ff6b35; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 2rem auto;"></div>
             
-            <h2 style="font-size: 1.5rem; font-weight: 600; color: #1a1a1a; margin-bottom: 1rem;">Evaluation in Progress</h2>
+            <h2 style="font-size: 1.5rem; font-weight: 600; color: #1a1a1a; margin-bottom: 1rem;">{{ 'evaluation_in_progress'|t(language) }}</h2>
             <p style="color: #666; line-height: 1.6; margin-bottom: 1.5rem;">
-                Please wait while we evaluate your AI responses using advanced language models. 
-                This may take a few moments depending on the number of questions.
+                {{ 'please_wait'|t(language) }}
             </p>
             
             <div style="background: #f8f9fa; border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">
-                <strong>File:</strong> <span id="processingFileName">-</span><br>
-                <strong>Status:</strong> <span id="processingQuestions">Analyzing file structure...</span>
+                <strong>{{ 'file_label'|t(language) }}</strong> <span id="processingFileName">-</span><br>
+                <strong>{{ 'status_label'|t(language) }}</strong> <span id="processingQuestions">{{ 'status_running'|t(language) }}</span>
             </div>
             
             <div style="margin-top: 2rem;">
                 <div style="display: flex; align-items: center; margin-bottom: 0.75rem; color: #28a745; font-size: 0.9rem;">
                     <i class="fas fa-check" style="width: 20px; margin-right: 0.75rem;"></i>
-                    File uploaded and validated
+                    {{ 'step_uploaded'|t(language) }}
                 </div>
                 <div style="display: flex; align-items: center; margin-bottom: 0.75rem; color: #ff6b35; font-size: 0.9rem; font-weight: 500;">
                     <i class="fas fa-brain" style="width: 20px; margin-right: 0.75rem;"></i>
-                    AI evaluation in progress<span style="animation: loading 1.4s infinite ease-in-out;">.</span><span style="animation: loading 1.4s infinite ease-in-out; animation-delay: -0.32s;">.</span><span style="animation: loading 1.4s infinite ease-in-out; animation-delay: -0.16s;">.</span>
+                    {{ 'step_evaluation'|t(language) }}<span style="animation: loading 1.4s infinite ease-in-out;">.</span><span style="animation: loading 1.4s infinite ease-in-out; animation-delay: -0.32s;">.</span><span style="animation: loading 1.4s infinite ease-in-out; animation-delay: -0.16s;">.</span>
                 </div>
                 <div style="display: flex; align-items: center; color: #666; font-size: 0.9rem;">
                     <i class="fas fa-chart-bar" style="width: 20px; margin-right: 0.75rem;"></i>
@@ -745,6 +775,29 @@
                 }
             });
         });
+
+        // Auto-scroll to error message if present on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const errorAlert = document.querySelector('.alert-danger');
+            if (errorAlert) {
+                setTimeout(() => {
+                    errorAlert.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                    // Optional: Add a subtle highlight animation
+                    errorAlert.style.animation = 'errorPulse 1s ease-in-out';
+                }, 500); // Small delay to ensure page is fully rendered
+            }
+        });
     </script>
+
+    <style>
+        @keyframes errorPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+    </style>
 </body>
 </html>
