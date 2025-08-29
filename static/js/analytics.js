@@ -8,7 +8,7 @@ class EvalNowAnalytics {
     getOrCreateUserId() {
         let userId = localStorage.getItem('evalnow_user_id');
         if (!userId) {
-            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
             localStorage.setItem('evalnow_user_id', userId);
         }
         return userId;
@@ -35,6 +35,7 @@ class EvalNowAnalytics {
                 ...data
             };
 
+            // Send to internal analytics
             await fetch('/api/analytics/track', {
                 method: 'POST',
                 headers: {
@@ -42,8 +43,44 @@ class EvalNowAnalytics {
                 },
                 body: JSON.stringify(eventData)
             });
+            
+            // Send to Google Tag Manager
+            this.trackGTMEvent(eventType, data);
         } catch (error) {
             console.log('Analytics tracking failed:', error);
+        }
+    }
+
+    trackGTMEvent(eventType, data = {}) {
+        // Send to Google Tag Manager dataLayer
+        if (typeof window.dataLayer !== 'undefined') {
+            try {
+                // Map internal events to GTM events
+                const eventMap = {
+                    'page_visit': 'page_view',
+                    'dataset_upload_started': 'file_upload',
+                    'dataset_uploaded': 'evaluation_completed',
+                    'pdf_download_clicked': 'pdf_download',
+                    'pdf_downloaded': 'download',
+                    'feedback_submitted': 'feedback'
+                };
+
+                const gtmEventName = eventMap[eventType] || eventType;
+                
+                // Send event to GTM dataLayer
+                window.dataLayer.push({
+                    'event': gtmEventName,
+                    'event_category': 'user_engagement',
+                    'event_label': data.filename || data.page || window.location.pathname,
+                    'value': data.dataset_size || data.filesize || 1,
+                    'user_id': this.userId,
+                    'page_location': window.location.href,
+                    'page_path': window.location.pathname,
+                    'custom_data': data
+                });
+            } catch (error) {
+                console.log('Google Tag Manager tracking failed:', error);
+            }
         }
     }
 
@@ -58,7 +95,7 @@ class EvalNowAnalytics {
         // Track file upload form
         const uploadForm = document.querySelector('form[action="/evaluation"]');
         if (uploadForm) {
-            uploadForm.addEventListener('submit', (e) => {
+            uploadForm.addEventListener('submit', () => {
                 const fileInput = uploadForm.querySelector('input[type="file"]');
                 if (fileInput && fileInput.files[0]) {
                     this.trackEvent('dataset_upload_started', {
@@ -102,6 +139,19 @@ class EvalNowAnalytics {
             input_tokens: data.input_tokens || 0,
             output_tokens: data.output_tokens || 0
         });
+        
+        // Send conversion event to Google Tag Manager
+        if (typeof window.dataLayer !== 'undefined') {
+            window.dataLayer.push({
+                'event': 'conversion',
+                'conversion_event': 'evaluation_completed',
+                'value': data.total_questions,
+                'currency': 'USD',
+                'dataset_size': data.total_questions,
+                'average_score': data.average_score,
+                'pass_rate': data.pass_rate
+            });
+        }
         
         // Update local storage stats
         this.updateLocalStats('evaluations');
