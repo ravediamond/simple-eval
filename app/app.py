@@ -649,12 +649,14 @@ async def upload_and_evaluate(
         user_id = get_user_id(request)
         
         # Check file size limit (50 questions max)
+        # Note: For CSV files, headers are automatically excluded from the count
         if total_questions > 50:
+            file_type = "rows" if file.filename.endswith(".jsonl") else "questions"
             return templates.TemplateResponse(
                 "landing.html",
                 {
                     "request": request,
-                    "error": f"File contains {total_questions} questions. Maximum allowed is 50 questions per file. Please join our waiting list for higher limits.",
+                    "error": f"File contains {total_questions} {file_type}. Maximum allowed is 50 questions per file. Please join our waiting list for higher limits.",
                     "show_waitlist": True
                 },
             )
